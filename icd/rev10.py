@@ -33,10 +33,17 @@ class ICD10Entry():
         return {child.code: child for child in self.children}
     
     def tree(self, prefix=""):
-        tree_str = f"{prefix}{str(self)}\n"
-        for child in self.children:
-            new_prefix = prefix + "\t"
-            tree_str += child.tree(prefix=new_prefix)
+        """Render the current object and all descendants in a pretty tree."""
+        tree_str = f"{str(self)}\n"
+        num_children = len(self.children)
+        for i,child in enumerate(self.children):
+            if i + 1 == num_children:
+                branch = "└───"
+                new_prefix = prefix + "    "
+            else:
+                branch = "├───"
+                new_prefix = prefix + "│   "
+            tree_str += prefix + branch + child.tree(new_prefix)
         return tree_str
             
     def add_child(self, new_child):
@@ -67,6 +74,33 @@ class ICD10Entry():
                 child.parent = None
         except ValueError:
             pass
+    
+    def find(self, code, maxdepth=None):
+        """
+        Find a given code in the tree.
+        
+        Args:
+            code: The code that should be found inside the ICD tree. Can be a 
+                chapter, block or diagnose.
+            maxdepth: Maximum depth the recursion search will go into. If `None` 
+                it will go down to all leaves.
+        
+        Returns:
+            The entry (chapter, block, diagnose) if it matches, else `None`
+        """
+        if self.code == code:
+            return self
+        
+        if maxdepth is not None and maxdepth < 1:
+            return None
+        
+        for child in self.children:
+            new_maxdepth = maxdepth - 1 if maxdepth is not None else None
+            if (found := child.find(code, maxdepth=new_maxdepth)) is not None:
+                return found
+        
+        return None
+
 
 @dataclass
 class ICD10Root(ICD10Entry):
@@ -176,6 +210,14 @@ class ICD10Block(ICD10Entry):
                 block.add_child(ICD10Diagnose.from_xml(xml_diag))
         
         return block
+    
+    def find(self, code, maxdepth=None):
+        """Stop searching when code is surely not in block."""
+        code_part = code.split(".")[0]
+        if not (code_part >= self.start_code and code_part <= self.end_code):
+            return None
+        return super().find(code, maxdepth)
+
 
 @dataclass
 class ICD10Diagnose(ICD10Entry):
