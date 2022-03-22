@@ -1,4 +1,4 @@
-# ICD
+# International Classification of Disease
 
 ## Motivation
 
