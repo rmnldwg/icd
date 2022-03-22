@@ -34,6 +34,12 @@ class ICD10Entry():
     def __str__(self):
         return f"{self._type} {self.code}: {self.title}"
     
+    def __len__(self):
+        if self.is_leaf:
+            return 1
+        else:
+            return sum([len(child) for child in self.children])
+    
     @property
     def is_leaf(self) -> bool:
         return len(self.children) == 0
@@ -57,15 +63,14 @@ class ICD10Entry():
         """
         Render the current object and all descendants in a pretty tree.
         
-        Args:
-            prefix: This string will be prefixed to the output of every entry. 
-                It should not be used directly, but is set by the recusion 
-                algorithm automatically.
-            maxdepth: Maximum depth of the tree that will be printed.
+        With `maxdepth` one can choose up to which depth of the tree the output 
+        should be rendered.
         
-        Returns:
-            The string containing the tree output. Use e.g. 
-            `print(icd_chapter.tree())` to nicely visualize the output.
+        To display the output nicely, put it in a `print` statement lie so:
+        
+        ```python
+        print(codex.tree(maxdepth=2))
+        ```
         """
         tree_str = f"{str(self)}\n"
         
@@ -124,14 +129,13 @@ class ICD10Entry():
         """
         Find a given code in the tree.
         
-        Args:
-            code: The code that should be found inside the ICD tree. Can be a 
-                chapter, block or diagnose.
-            maxdepth: Maximum depth the recursion search will go into. If `None` 
-                it will go down to all leaves.
+        The argument `code` can be a chapter number, block range or actual ICD 
+        code of a disease.
         
-        Returns:
-            The entry (chapter, block, diagnose) if it matches, else `None`
+        `maxdepth` is the maximum recusion depth the method will go into for 
+        the search.
+        
+        It returns the entry (chapter, block, diagnose) if found, else `None`.
         """
         if self.code == code:
             return self
@@ -152,20 +156,23 @@ class ICD10Entry():
         icd_api_id: Optional[str] = None, 
         icd_api_secret: Optional[str] = None,
         api_ver: int = 2,
-        lang: str = "en"
+        lang: str = "en",
     ) -> str:
         """
-        Return information on entry from WHO's ICD API.
+        Return information on an entry from WHO's ICD API.
         
-        Args:
-            auth_method: Can be `"args"`, in which case the arguments 
-                `icd_api_id` and `icd_api_secret` must be provided, or `"env"`, 
-                so that these two can be retrieved from environment variables 
-                called `ICD_API_ID` and `ICD_API_SECRET` respectively.
-            icd_api_id: The ID for accessing the ICD API.
-            icd_api_secret: Key/secret for accessing the ICD API.
-            api_ver: The version of the API to use.
-            lang: Accepted language of the response.
+        This function provides two ways for authenticating to the API: One can 
+        simply provide the `ClientId` as `icd_api_id` and the `ClientSecret` as 
+        `icd_api_secret`, in which case `auth_method` must be set to `"args"`. 
+        Or the two strings can be set as environment variables aptly named 
+        `ICD_API_ID` and `ICD_API_SECRET`. In that case, set `auth_method` to 
+        `"env"`.
+        
+        There are two major versions of the ICD API that can be chosen by 
+        setting `api_ver` to either `1` ot `2`.
+        
+        The API provides its response in different languages, which can be 
+        selected by setting `lang`, e.g. to `"en"`.
         """
         if auth_method == "env":
             icd_api_id = os.getenv("ICD_API_ID")
@@ -188,8 +195,8 @@ class ICD10Entry():
         access_token = r["access_token"]
         
         # Make request
-        release_id = self.get_root().release_id
-        uri = f"https://id.who.int/icd/release/10/{release_id}/{self.code}"
+        year = self.get_root().year
+        uri = f"https://id.who.int/icd/release/10/{year}/{self.code}"
         headers = {
             "Authorization": "Bearer " + access_token,
             "Accept": "application/json",
@@ -223,18 +230,18 @@ class ICD10Root(ICD10Entry):
     """
     code: str = "ICD10"
     title: str = "10th revision of the International Classification of Disease"
-    release_id: str = field(repr=False, default="")
+    year: str = field(repr=False, default="")
     """The release of the loaded ICD codex. E.g. `2022` for the release 
     including corrections made prior to the year 2022."""
     _type: str = field(repr=False, default="root")
     
     def __str__(self):
-        return f"{self._type} {self.code} (v{self.release_id}): {self.title}"
+        return f"{self._type} {self.code} (v{self.year}): {self.title}"
     
     @classmethod
     def from_xml(cls, xml_root: untangle.Element) -> ICD10Root:
         """Create root and entire ICD tree from XML root entry."""
-        root = cls(release_id=xml_root.version.cdata)        
+        root = cls(year=xml_root.version.cdata)        
         for xml_chapter in xml_root.chapter:
             root.add_child(ICD10Chapter.from_xml(xml_chapter))
         return root
@@ -404,18 +411,26 @@ class ICD10Diagnose(ICD10Entry):
         return diagnose
 
 
-# Load the data and parse it
-xml_file_path = os.path.join(DATA_DIR, "icd10cm_tabular_2022.xml")
-xml_data = untangle.parse(xml_file_path).ICD10CM_tabular
 
-codex = ICD10Root.from_xml(xml_data)
-"""This is the entire ICD 10 CM codex, for convenience loaded from the
-[CDC](https://ftp.cdc.gov/pub/Health_Statistics/NCHS/Publications/ICD10CM/2022/)
-in XML format. It can be accessed like this
-
-```python
-import icd.rev10
-
-entire_icd10cm = icd.rev10.codex
-```
-"""
+def get_codex(year: int) -> ICD10Root:
+    """Parse codex of given release ID. Download respective data if necessary.
+    
+    The `year` argument refers to the fiscal year the data was released and 
+    determines which data is used (or downloaded from the CDC website).
+    
+    Curiously, the CDC releases a new set of ICD-10-CM files every year, while 
+    the WHO's last release (at the time of writing) was 2019. 
+    """
+    xml_path = os.path.join(DATA_DIR, f"icd10cm_tabular_{year}.xml")
+    
+    if not os.path.exists(xml_path):
+        download_url = (
+            "https://ftp.cdc.gov/pub/Health_Statistics/NCHS/Publications/"
+            f"ICD10CM/{year}/icd10cm_tabular_{year}.xml"
+        )
+        response = requests.get(download_url)
+        with open(xml_path, 'w') as xml_file:
+            xml_file.write(response.content.decode())
+    
+    xml_root = untangle.parse(xml_path).ICD10CM_tabular
+    return ICD10Root.from_xml(xml_root)
