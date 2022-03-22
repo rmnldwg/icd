@@ -42,6 +42,13 @@ class ICD10Entry():
     def is_root(self) -> bool:
         return self.parent is None
     
+    def get_root(self) -> ICD10Root:
+        """Recursively find the root of the ICD codex from any entry."""
+        if self.is_root:
+            return self
+        else:
+            return self.parent.get_root()
+    
     @property
     def _child_dict(self) -> Dict[str, ICD10Entry]:
         return {child.code: child for child in self.children}
@@ -138,6 +145,74 @@ class ICD10Entry():
                 return found
         
         return None
+    
+    def request(
+        self, 
+        auth_method: str = "args", 
+        icd_api_id: Optional[str] = None, 
+        icd_api_secret: Optional[str] = None,
+        api_ver: int = 2,
+        lang: str = "en"
+    ) -> str:
+        """
+        Return information on entry from WHO's ICD API.
+        
+        Args:
+            auth_method: Can be `"args"`, in which case the arguments 
+                `icd_api_id` and `icd_api_secret` must be provided, or `"env"`, 
+                so that these two can be retrieved from environment variables 
+                called `ICD_API_ID` and `ICD_API_SECRET` respectively.
+            icd_api_id: The ID for accessing the ICD API.
+            icd_api_secret: Key/secret for accessing the ICD API.
+            api_ver: The version of the API to use.
+            lang: Accepted language of the response.
+        """
+        if auth_method == "env":
+            icd_api_id = os.getenv("ICD_API_ID")
+            icd_api_secret = os.getenv("ICD_API_SECRET")
+        elif auth_method != "args":
+            raise ValueError("`auth_method` must be either 'args' or 'env'.")
+        
+        if icd_api_id is None or icd_api_secret is None:
+            raise ValueError("Both ICD_API_ID and ICD_API_SECRET must be set.")
+        
+        # Authenticate
+        token_endpoint = "https://icdaccessmanagement.who.int/connect/token"
+        payload = {
+            "client_id": icd_api_id,
+            "client_secret": icd_api_secret,
+            "scope": "icdapi_access",
+            "grant_type": "client_credentials"
+        }
+        r = requests.post(token_endpoint, data=payload).json()
+        access_token = r["access_token"]
+        
+        # Make request
+        release_id = self.get_root().release_id
+        uri = f"https://id.who.int/icd/release/10/{release_id}/{self.code}"
+        headers = {
+            "Authorization": "Bearer " + access_token,
+            "Accept": "application/json",
+            "Accept-Language": lang,
+            "API-Version": f"v{api_ver}",
+        }
+        r = requests.get(uri, headers=headers)
+        
+        # check if request was successful, if not, try to get another release
+        if r.status_code != requests.codes.ok:
+            fallback_uri = f"https://id.who.int/icd/release/10/{self.code}"
+            r = requests.get(fallback_uri, headers=headers)
+            
+            if r.status_code == requests.codes.ok:
+                latest_uri = r.json()["latestRelease"]
+                r = requests.get(latest_uri, headers=headers)
+            else:
+                raise requests.HTTPError(
+                    f"Could not resolve code {self.code}", 
+                    response=r
+                )
+        
+        return r
 
 
 @dataclass
@@ -148,18 +223,18 @@ class ICD10Root(ICD10Entry):
     """
     code: str = "ICD10"
     title: str = "10th revision of the International Classification of Disease"
-    version: str = field(repr=False, default="")
-    """Displays the version of the loaded ICD codex. E.g., 2022 for the version 
+    release_id: str = field(repr=False, default="")
+    """The release of the loaded ICD codex. E.g. `2022` for the release 
     including corrections made prior to the year 2022."""
     _type: str = field(repr=False, default="root")
     
     def __str__(self):
-        return f"{self._type} {self.code} (v{self.version}): {self.title}"
+        return f"{self._type} {self.code} (v{self.release_id}): {self.title}"
     
     @classmethod
     def from_xml(cls, xml_root: untangle.Element) -> ICD10Root:
         """Create root and entire ICD tree from XML root entry."""
-        root = cls(version=xml_root.version.cdata)        
+        root = cls(release_id=xml_root.version.cdata)        
         for xml_chapter in xml_root.chapter:
             root.add_child(ICD10Chapter.from_xml(xml_chapter))
         return root
