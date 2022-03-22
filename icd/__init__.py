@@ -1,5 +1,5 @@
 from .rev10 import ICD10Root
+from ._version import version
 
-__all__ = [
-    "ICD10Root"
-]
+__version__ = version
+__all__ = ["ICD10Root"]
