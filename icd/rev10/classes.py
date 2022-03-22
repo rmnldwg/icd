@@ -1,3 +1,8 @@
+"""
+This module defines dataclasses that can parse, display and provide utilities 
+for the ICD codex (10th revision).
+"""
+
 from dataclasses import dataclass, field
 from typing import List, Optional
 
@@ -32,9 +37,15 @@ class ICD10Entry():
     def _child_dict(self):
         return {child.code: child for child in self.children}
     
-    def tree(self, prefix=""):
+    def tree(self, prefix="", maxdepth=None):
         """Render the current object and all descendants in a pretty tree."""
         tree_str = f"{str(self)}\n"
+        
+        if isinstance(maxdepth, int) and maxdepth < 1:
+            return tree_str
+        elif isinstance(maxdepth, int):
+            maxdepth = maxdepth - 1
+        
         num_children = len(self.children)
         for i,child in enumerate(self.children):
             if i + 1 == num_children:
@@ -43,7 +54,7 @@ class ICD10Entry():
             else:
                 branch = "├───"
                 new_prefix = prefix + "│   "
-            tree_str += prefix + branch + child.tree(new_prefix)
+            tree_str += prefix + branch + child.tree(new_prefix, maxdepth)
         return tree_str
             
     def add_child(self, new_child):
@@ -109,12 +120,16 @@ class ICD10Root(ICD10Entry):
     """
     code: str = "ICD10"
     title: str = "10th revision of the International Classification of Disease"
+    version: str = field(repr=False, default="")
     _type: str = field(repr=False, default="root")
+    
+    def __str__(self):
+        return f"{self._type} {self.code} (v{self.version}): {self.title}"
     
     @classmethod
     def from_xml(cls, xml_root: untangle.Element):
         """Create root and entire ICD tree from XML root entry."""
-        root = cls()        
+        root = cls(version=xml_root.version.cdata)        
         for xml_chapter in xml_root.chapter:
             root.add_child(ICD10Chapter.from_xml(xml_chapter))
         return root
@@ -133,7 +148,22 @@ class ICD10Chapter(ICD10Entry):
     
     def __post_init__(self):
         # TODO: Romanize the chapter number
-        self.code = self.code
+        units     = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX']
+        tens      = ['', 'X', 'XX', 'XXX', 'XL', 'L', 'LX', 'LXX', 'LXXX', 'XC']
+        hundrets  = ['', 'C', 'CC', 'CCC', 'CD', 'D', 'DC', 'DCC', 'DCCC', 'CM']
+        thousands = ['', 'M', 'MM', 'MMM']
+        try:
+            chapter_num = int(self.code)
+        except ValueError:
+            raise ValueError("Chapter number must be integer")
+        roman_num = thousands[chapter_num // 1000]
+        chapter_num = chapter_num % 1000
+        roman_num += hundrets[chapter_num // 100]
+        chapter_num = chapter_num % 100
+        roman_num += tens[chapter_num // 10]
+        chapter_num = chapter_num % 10
+        roman_num += units[chapter_num]
+        self.code = roman_num
         
     @classmethod
     def from_xml(cls, xml_chapter):
