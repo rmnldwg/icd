@@ -2,43 +2,64 @@
 This module defines dataclasses that can parse, display and provide utilities 
 for the ICD codex (10th revision).
 """
-
+import os
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import List, Optional, Dict, Union
+from __future__ import annotations
 
 import untangle
 import requests
+
+from .config import DATA_DIR
 
 
 @dataclass
 class ICD10Entry():
     """
-    Dataclass representing an ICD chapter, block or code of the 10th 
+    Base dataclass representing an ICD chapter, block or code of the 10th 
     ICD revision.
+    
+    Attributes:
+        code: The chapter number, block range or ICD code of the entry.
+        title: Description of the chapter, block or diagnose.
+        parent: Direct ancestor of the entry.
+        children: List of direct descendants of the entry.
     """
     code: str
     title: str
     _type: str
-    parent: Optional[object] = field(default=None, repr=False)
-    children: List[object] = field(default_factory=lambda: [], repr=False)
+    parent: Optional[ICD10Entry] = field(default=None, repr=False)
+    children: List[ICD10Entry] = field(default_factory=lambda: [], repr=False)
     
     def __str__(self):
         return f"{self._type} {self.code}: {self.title}"
     
     @property
-    def is_leaf(self):
+    def is_leaf(self) -> bool:
         return len(self.children) == 0
     
     @property
-    def is_root(self):
+    def is_root(self) -> bool:
         return self.parent is None
     
     @property
-    def _child_dict(self):
+    def _child_dict(self) -> Dict[str, ICD10Entry]:
         return {child.code: child for child in self.children}
     
     def tree(self, prefix="", maxdepth=None):
-        """Render the current object and all descendants in a pretty tree."""
+        """
+        Render the current object and all descendants in a pretty tree.
+        
+        Args:
+            prefix: This string will be prefixed to the output of every entry. 
+                It should not be used directly, but is set by the recusion 
+                algorithm automatically.
+            maxdepth: Maximum depth of the tree that will be printed.
+        
+        Returns:
+            The string containing the tree output. Use e.g. 
+            `print(icd_chapter.tree())` to nicely visualize the output.
+        """
         tree_str = f"{str(self)}\n"
         
         if isinstance(maxdepth, int) and maxdepth < 1:
@@ -57,7 +78,7 @@ class ICD10Entry():
             tree_str += prefix + branch + child.tree(new_prefix, maxdepth)
         return tree_str
             
-    def add_child(self, new_child):
+    def add_child(self, new_child: ICD10Entry):
         """
         Add new child in a consistent manner. I.e., if the to-be-added child 
         is a block that would actually belong in an existing block, put it 
@@ -78,7 +99,13 @@ class ICD10Entry():
         new_child.parent = self
         self.children.append(new_child)
     
-    def remove_child(self, child):
+    def remove_child(self, child: ICD10Entry):
+        """
+        Remove `child` from `self.children` list in a cautios manner. This 
+        means that if the child has already been added as some other object's 
+        child and has hence already a new `parent` attribute, it won't be 
+        deleted.
+        """
         try:
             self.children.remove(child)
             if child.parent == self:
@@ -86,7 +113,7 @@ class ICD10Entry():
         except ValueError:
             pass
     
-    def find(self, code, maxdepth=None):
+    def find(self, code: str, maxdepth: Optional[int] = None) -> ICD10Entry:
         """
         Find a given code in the tree.
         
@@ -116,7 +143,15 @@ class ICD10Entry():
 @dataclass
 class ICD10Root(ICD10Entry):
     """
-    Root of the ICD 10 tree.
+    Root of the ICD 10 tree. It serves as an entry point for the recursive 
+    parsing of the XML data file and also stores the version of the data.
+    
+    Attributes:
+        version: Displays the version of the loaded ICD codex. E.g., 2022 for 
+            the version including corrections made prior to the year 2022.
+        chapter: Returns a dictionary containing all the ICD chapters loaded 
+            under a roman-numeral key. E.g., chapter 2 can be accessed via 
+            something like `root.chapter['II']`.
     """
     code: str = "ICD10"
     title: str = "10th revision of the International Classification of Disease"
@@ -127,7 +162,7 @@ class ICD10Root(ICD10Entry):
         return f"{self._type} {self.code} (v{self.version}): {self.title}"
     
     @classmethod
-    def from_xml(cls, xml_root: untangle.Element):
+    def from_xml(cls, xml_root: untangle.Element) -> ICD10Root:
         """Create root and entire ICD tree from XML root entry."""
         root = cls(version=xml_root.version.cdata)        
         for xml_chapter in xml_root.chapter:
@@ -135,19 +170,29 @@ class ICD10Root(ICD10Entry):
         return root
     
     @property
-    def chapter(self):
+    def chapter(self) -> ICD10Chapter:
         return self._child_dict
 
 
 @dataclass
 class ICD10Chapter(ICD10Entry):
     """
-    One of 22 chapters of the ICD.
+    One of the 22 chapters in the ICD codex. In the XML data obtained from the 
+    [CDC](https://ftp.cdc.gov/pub/Health_Statistics/NCHS/Publications/ICD10CM/2022/) 
+    the chapter numbers are given in arabic numerals, but the WHO's API uses 
+    roman numerals to identify chapters, so the `code` attribute is converted. 
+    E.g., chapter `2` will be accessible from the root via `root.chapter['II']`.
+    
+    Attributes:
+        block: Returns a dictionary containing all blocks loaded for this 
+            chapter under a key corresponding to their ICD-range. E.g., block 
+            `C00-C96` contains all diagnoses with codes ranging from `C00` to 
+            `C96`.
     """
     _type: str = field(repr=False, default="chapter")
     
     def __post_init__(self):
-        # TODO: Romanize the chapter number
+        """Romanize chapter number."""
         units     = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX']
         tens      = ['', 'X', 'XX', 'XXX', 'XL', 'L', 'LX', 'LXX', 'LXXX', 'XC']
         hundrets  = ['', 'C', 'CC', 'CCC', 'CD', 'D', 'DC', 'DCC', 'DCCC', 'CM']
@@ -166,7 +211,7 @@ class ICD10Chapter(ICD10Entry):
         self.code = roman_num
         
     @classmethod
-    def from_xml(cls, xml_chapter):
+    def from_xml(cls, xml_chapter: untangle.Element) -> ICD10Chapter:
         """Create chapter from respective XML chapter entry."""
         chapter = cls(
             code=xml_chapter.name.cdata,
@@ -178,23 +223,36 @@ class ICD10Chapter(ICD10Entry):
         return chapter
     
     @property
-    def block(self):
+    def block(self) -> Dict[str, ICD10Block]:
         return self._child_dict
 
 
 @dataclass
 class ICD10Block(ICD10Entry):
     """
-    A block of ICD codes within a chapter.
+    A block of ICD codes within a chapter. A block specifies a range of ICD 
+    codes that are described in that block. It may also contain other blocks, 
+    not necessarily diagnoses as direct children. The `code` attribute of a 
+    block might be something like `C00-C96`.
+    
+    Attributes:
+        start_code: Returns the first ICD code included in this diagnose block.
+        end_code: Respectively returns the last ICD code of the block.
+        block: Like :class:`ICD10Chapter`, a block might have blocks as 
+            children, which can be accessed in the exact same way as for the 
+            chapter.
+        diagnose: In case the block does not have blocks, but diagnoses as 
+            children, they can be accessed via the `diagnose` attribute, which 
+            also returns a dictionary, just like `block`.
     """
     _type: str = field(repr=False, default="block")
     
     @property
-    def start_code(self):
+    def start_code(self) -> str:
         return self.code.split("-")[0]
             
     @property
-    def end_code(self):
+    def end_code(self) -> str:
         split_code = self.code.split("-")
         if len(split_code) == 1:
             return self.start_code
@@ -207,16 +265,16 @@ class ICD10Block(ICD10Entry):
             )
     
     @property
-    def block(self):
+    def block(self) -> ICD10Block:
         if len(self.children) > 0 and isinstance(self.children[0], ICD10Block):
             return self._child_dict
     
     @property
-    def diagnose(self):
+    def diagnose(self) -> ICD10Diagnose:
         if len(self.children) > 0 and isinstance(self.children[0], ICD10Diagnose):
             return self._child_dict
     
-    def should_contain(self, block):
+    def should_contain(self, block: ICD10Block) -> bool:
         """Check whether this block should contain the given block"""
         if self == block or block in self.children:
             return False
@@ -229,7 +287,7 @@ class ICD10Block(ICD10Entry):
         return False
     
     @classmethod
-    def from_xml(cls, xml_section):
+    def from_xml(cls, xml_section: untangle.Element) -> ICD10Block:
         """Create block of ICD diagnoses from XML section"""
         block = cls(
             code=xml_section["id"],
@@ -241,7 +299,7 @@ class ICD10Block(ICD10Entry):
         
         return block
     
-    def find(self, code, maxdepth=None):
+    def find(self, code: str, maxdepth:int = None) -> ICD10Block:
         """Stop searching when code is surely not in block."""
         code_part = code.split(".")[0]
         if not (code_part >= self.start_code and code_part <= self.end_code):
@@ -252,16 +310,18 @@ class ICD10Block(ICD10Entry):
 @dataclass
 class ICD10Diagnose(ICD10Entry):
     """
-    A diagnose of the ICD system.
+    A diagnose of the ICD system. These are the only entries in the ICD codex 
+    for which the `code` attribute actually holds a valid ICD code in the regex 
+    form `[A-Z][0-9]{2}(.[0-9]{1,3})?`.
     """
     _type: str = field(repr=False, default="diagnose")
     
     @property
-    def diagnose(self):
+    def diagnose(self) -> ICD10Diagnose:
         return self._child_dict
     
     @classmethod
-    def from_xml(cls, xml_diag):
+    def from_xml(cls, xml_diag: untangle.Element) -> ICD10Diagnose:
         """Recursively create tree of diagnoses and subdiagnoses from XML."""
         diagnose = cls(
             code=xml_diag.name.cdata,
@@ -272,3 +332,9 @@ class ICD10Diagnose(ICD10Entry):
                 diagnose.add_child(ICD10Diagnose.from_xml(xml_subdiag))
         
         return diagnose
+
+
+# Load the data and parse it
+xml_file_path = os.path.join(DATA_DIR, "icd10cm_tabular_2022.xml")
+xml_data = untangle.parse(xml_file_path).ICD10CM_tabular
+codex = ICD10Root.from_xml(xml_data)
