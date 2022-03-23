@@ -11,6 +11,7 @@ from typing import List, Optional, Dict
 
 import untangle
 import requests
+from tqdm import tqdm
 
 from ._config import DATA_DIR
 
@@ -26,23 +27,44 @@ class ICD10Entry():
     title: str
     """Description of the chapter, block or diagnose."""
     _type: str
-    parent: Optional[ICD10Entry] = field(default=None, repr=False)
+    parent: Optional[ICD10Entry] = field(
+        default=None, repr=False, compare=False
+    )
     """Direct ancestor of the entry."""
-    children: List[ICD10Entry] = field(default_factory=lambda: [], repr=False)
+    children: List[ICD10Entry] = field(
+        default_factory=lambda: [], repr=False, compare=False
+    )
     """List of direct descendants of the entry."""
     
     def __str__(self):
         return f"{self._type} {self.code}: {self.title}"
     
     def __len__(self):
-        if self.is_leaf:
-            return 1
-        else:
-            return sum([len(child) for child in self.children])
+        return 1 + sum([len(child) for child in self.children])
     
     @property
     def is_leaf(self) -> bool:
         return len(self.children) == 0
+    
+    @property
+    def leaves(self):
+        """Returns an iterator over all leaves of the ICD tree."""
+        if self.is_leaf:
+            yield self
+        else:
+            for child in self.children:
+                yield from child.leaves
+    
+    @property
+    def entries(self):
+        """
+        Returns an iterator over all entries in the ICD tree. This includes 
+        chapters, blocks and diagnoses, not only diagnoses as is the case for 
+        `ICD10Entry.leaves`.
+        """
+        yield self
+        for child in self.children:
+            yield from child.entries
     
     @property
     def is_root(self) -> bool:
@@ -410,27 +432,108 @@ class ICD10Diagnose(ICD10Entry):
         
         return diagnose
 
-
-
-def get_codex(year: int) -> ICD10Root:
-    """Parse codex of given release ID. Download respective data if necessary.
+def get_codex(
+    year: int, 
+    download: bool = True, 
+    verbose: bool = False
+) -> ICD10Root:
+    """
+    Parse codex of given release year. Download respective data if necessary.
     
     The `year` argument refers to the fiscal year the data was released and 
-    determines which data is used (or downloaded from the CDC website).
+    determines which data is used. If the data is not available at the 
+    directory, but `download` is set to `True`, then the file is downloaded 
+    from the CDC.
     
     Curiously, the CDC releases a new set of ICD-10-CM files every year, while 
     the WHO's last release (at the time of writing) was 2019. 
+    
+    Set `vebose` to `True` if you want to track the progress of the download.
     """
+    verboseprint = print if verbose else lambda *a, **k: None
+    
     xml_path = os.path.join(DATA_DIR, f"icd10cm_tabular_{year}.xml")
     
-    if not os.path.exists(xml_path):
-        download_url = (
+    verboseprint(f"Looking for XML file at {xml_path}...", end="")
+    if not os.path.exists(xml_path) and download:
+        verboseprint("FAILED, attempting download:")
+        download_from_CDC(year, verbose=verbose)
+    elif not os.path.exists(xml_path):
+        raise IOError(
+            f"File {xml_path} does not exist. Try setting `download` to `True` "
+            "to automatically download the file from the CDC."
+        )
+    else:
+        verboseprint("FOUND")
+    
+    verboseprint("Parsing...", end="")
+    xml_root = untangle.parse(xml_path).ICD10CM_tabular
+    codex = ICD10Root.from_xml(xml_root)
+    verboseprint("SUCCESS")
+    return codex
+
+
+def download_from_CDC(
+    year: int = 2022, 
+    custom_url: Optional[str] = None, 
+    save_path: Optional[str] = None,
+    verbose: bool = False,
+):
+    """Download ICD XML file from the CDC's website.
+    
+    The `year` refers to the fiscal year the data was released in. With 
+    `custom_url` one can overwrite the default download url from the CDC 
+    https://ftp.cdc.gov/pub/Health_Statistics/NCHS/Publications/ICD10CM/<year>/icd10cm_tabular_<year>.xml. 
+    Note that the CDC provides files with the name `icd10cm_tabular_<year>.xml` 
+    only since 2019. So, if you need earlier data, you might want to check out 
+    how the files were named before that youself.
+    
+    `save_path` overwrites the default path to save the downloaded file in.
+    """
+    verboseprint = print if verbose else lambda *a, **k: None
+    
+    if custom_url is not None:
+        url = custom_url
+    else:
+        url = (
             "https://ftp.cdc.gov/pub/Health_Statistics/NCHS/Publications/"
             f"ICD10CM/{year}/icd10cm_tabular_{year}.xml"
         )
-        response = requests.get(download_url)
-        with open(xml_path, 'w') as xml_file:
-            xml_file.write(response.content.decode())
     
-    xml_root = untangle.parse(xml_path).ICD10CM_tabular
-    return ICD10Root.from_xml(xml_root)
+    verboseprint("Requesting file from URL...", end="")
+    response = requests.get(url, stream=True)
+    
+    if response.status_code != requests.codes.ok:
+        raise requests.RequestException(
+            f"Downloading failed with status code {response.status_code}"
+        )
+    verboseprint("SUCCESS")
+    
+    verboseprint("Preparing save directory...", end="")
+    if save_path is not None and not os.path.exists(save_path):
+        raise IOError(f"No such directory: {save_path}")
+    else:
+        save_path = os.path.join(DATA_DIR, f"icd10cm_tabular_{year}.xml")
+    verboseprint("SUCCESS")
+    
+    total_size = int(response.headers.get("content-length", 0))
+    block_size = 1024
+    progress_bar = tqdm(
+        total=total_size, 
+        unit="iB", 
+        unit_scale=True,
+        desc="Downloading XML file",
+        disable=not verbose
+    )
+    
+    with open(save_path, 'wb') as xml_file:
+        for binary_data in response.iter_content(block_size):
+            xml_file.write(binary_data)
+            progress_bar.update(len(binary_data))
+    
+    progress_bar.close()
+    
+    if verbose and total_size != 0 and total_size != progress_bar.n:
+        raise RuntimeError(
+            f"Downloaded file seems incomplete. Check file at {save_path}"
+        )
