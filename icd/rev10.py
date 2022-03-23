@@ -1,8 +1,7 @@
 """
 This module defines dataclasses that can parse, display and provide utilities 
-for the ICD codex (10th revision). For convenience, data is provided in the 
-`./data` directory, which is automatically parsed and made available as `codex` 
-when `icd.rev10` is imported.
+for the International statistical classification of diseases and related health 
+problems (10th revision).
 """
 from __future__ import annotations
 import os
@@ -25,8 +24,8 @@ class ICD10Entry():
     code: str
     """The chapter number, block range or ICD code of the entry."""
     title: str
-    """Description of the chapter, block or diagnose."""
-    _type: str
+    """Description of the chapter, block or category."""
+    kind: str
     parent: Optional[ICD10Entry] = field(
         default=None, repr=False, compare=False
     )
@@ -37,7 +36,7 @@ class ICD10Entry():
     """List of direct descendants of the entry."""
     
     def __str__(self):
-        return f"{self._type} {self.code}: {self.title}"
+        return f"{self.kind} {self.code}: {self.title}"
     
     def __len__(self):
         return 1 + sum([len(child) for child in self.children])
@@ -59,7 +58,7 @@ class ICD10Entry():
     def entries(self):
         """
         Returns an iterator over all entries in the ICD tree. This includes 
-        chapters, blocks and diagnoses, not only diagnoses as is the case for 
+        chapters, blocks and categories, not only categories as is the case for 
         `ICD10Entry.leaves`.
         """
         yield self
@@ -170,7 +169,7 @@ class ICD10Entry():
         `maxdepth` is the maximum recusion depth the method will go into for 
         the search.
         
-        It returns the entry (chapter, block, diagnose) if found, else `None`.
+        It returns the entry (chapter, block, category) if found, else `None`.
         """
         if self.code == code:
             return self
@@ -224,7 +223,7 @@ class ICD10Entry():
             "client_id": icd_api_id,
             "client_secret": icd_api_secret,
             "scope": "icdapi_access",
-            "grant_type": "client_credentials"
+            "grantkind": "client_credentials"
         }
         r = requests.post(token_endpoint, data=payload).json()
         access_token = r["access_token"]
@@ -268,10 +267,10 @@ class ICD10Root(ICD10Entry):
     year: str = field(repr=False, default="")
     """The release of the loaded ICD codex. E.g. `2022` for the release 
     including corrections made prior to the year 2022."""
-    _type: str = field(repr=False, default="root")
+    kind: str = field(repr=False, default="root")
     
     def __str__(self):
-        return f"{self._type} {self.code} (v{self.year}): {self.title}"
+        return f"{self.kind} {self.code} (v{self.year}): {self.title}"
     
     @classmethod
     def from_xml(cls, xml_root: untangle.Element) -> ICD10Root:
@@ -298,7 +297,7 @@ class ICD10Chapter(ICD10Entry):
     roman numerals to identify chapters, so the `code` attribute is converted. 
     E.g., chapter `2` will be accessible from the root via `root.chapter['II']`.
     """
-    _type: str = field(repr=False, default="chapter")
+    kind: str = field(repr=False, default="chapter")
     
     def __post_init__(self):
         """Romanize chapter number."""
@@ -335,7 +334,7 @@ class ICD10Chapter(ICD10Entry):
     def block(self) -> Dict[str, ICD10Block]:
         """Returns a dictionary containing all blocks loaded for this chapter 
         under a key corresponding to their ICD-range. E.g., block `C00-C96` 
-        contains all diagnoses with codes ranging from `C00` to `C96`."""
+        contains all categories with codes ranging from `C00` to `C96`."""
         return self._child_dict
 
 
@@ -344,14 +343,14 @@ class ICD10Block(ICD10Entry):
     """
     A block of ICD codes within a chapter. A block specifies a range of ICD 
     codes that are described in that block. It may also contain other blocks, 
-    not necessarily diagnoses as direct children. The `code` attribute of a 
+    not necessarily categories as direct children. The `code` attribute of a 
     block might be something like `C00-C96`.
     """
-    _type: str = field(repr=False, default="block")
+    kind: str = field(repr=False, default="block")
     
     @property
     def start_code(self) -> str:
-        """Returns the first ICD code included in this diagnose block."""
+        """Returns the first ICD code included in this block."""
         return self.code.split("-")[0]
             
     @property
@@ -376,11 +375,11 @@ class ICD10Block(ICD10Entry):
             return self._child_dict
     
     @property
-    def diagnose(self) -> ICD10Diagnose:
-        """In case the block does not have blocks, but diagnoses as children, 
-        they can be accessed via the `diagnose` attribute, which also returns a 
+    def category(self) -> ICD10Category:
+        """In case the block does not have blocks, but categories as children, 
+        they can be accessed via the `category` attribute, which also returns a 
         dictionary, just like `block`."""
-        if len(self.children) > 0 and isinstance(self.children[0], ICD10Diagnose):
+        if len(self.children) > 0 and isinstance(self.children[0], ICD10Category):
             return self._child_dict
     
     def should_contain(self, block: ICD10Block) -> bool:
@@ -397,14 +396,14 @@ class ICD10Block(ICD10Entry):
     
     @classmethod
     def from_xml(cls, xml_section: untangle.Element) -> ICD10Block:
-        """Create block of ICD diagnoses from XML section"""
+        """Create block of ICD categories from XML section"""
         block = cls(
             code=xml_section["id"],
             title=xml_section.desc.cdata,
         )
         if hasattr(xml_section, "diag"):
             for xml_diag in xml_section.diag:
-                block.add_child(ICD10Diagnose.from_xml(xml_diag))
+                block.add_child(ICD10Category.from_xml(xml_diag))
         
         return block
     
@@ -417,33 +416,33 @@ class ICD10Block(ICD10Entry):
 
 
 @dataclass
-class ICD10Diagnose(ICD10Entry):
+class ICD10Category(ICD10Entry):
     """
-    A diagnose of the ICD system. These are the only entries in the ICD codex 
+    A category of the ICD system. These are the only entries in the ICD codex 
     for which the `code` attribute actually holds a valid ICD code in the regex 
     form `[A-Z][0-9]{2}(.[0-9]{1,3})?`.
     """
-    _type: str = field(repr=False, default="diagnose")
+    kind: str = field(repr=False, default="category")
     
     @property
-    def diagnose(self) -> ICD10Diagnose:
-        """If there exists a finer classification of the diagnose, this 
+    def category(self) -> ICD10Category:
+        """If there exists a finer classification of the category, this 
         property returns them as a dictionary of respective ICDs as key and the 
         actual entry as value."""
         return self._child_dict
     
     @classmethod
-    def from_xml(cls, xml_diag: untangle.Element) -> ICD10Diagnose:
-        """Recursively create tree of diagnoses and subdiagnoses from XML."""
-        diagnose = cls(
+    def from_xml(cls, xml_diag: untangle.Element) -> ICD10Category:
+        """Recursively create tree of categories and subcategories from XML."""
+        category = cls(
             code=xml_diag.name.cdata,
             title=xml_diag.desc.cdata,
         )
         if hasattr(xml_diag, "diag"):
             for xml_subdiag in xml_diag.diag:
-                diagnose.add_child(ICD10Diagnose.from_xml(xml_subdiag))
+                category.add_child(ICD10Category.from_xml(xml_subdiag))
         
-        return diagnose
+        return category
 
 def get_codex(
     year: int, 
