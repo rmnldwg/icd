@@ -111,6 +111,19 @@ class ICD10Entry():
                 new_prefix = prefix + "│   "
             tree_str += prefix + branch + child.tree(new_prefix, maxdepth)
         return tree_str
+    
+    def ancestry(self):
+        """
+        Render ancestry from root directly to the current entry. Like with the 
+        `tree()` method, this should be put inside a `print()` statement.
+        """
+        if self.is_root:
+            return str(self) + "\n"
+        else:
+            ancestry_str = self.parent.ancestry()
+            nlines = ancestry_str.count("\n")
+            return ancestry_str + (nlines - 1) * "    " + "└───" + str(self) + "\n"
+            
             
     def add_child(self, new_child: ICD10Entry):
         """
