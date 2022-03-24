@@ -1,4 +1,6 @@
 """
+## Python module for use with the base ICD-10
+
 This is an independent python implementation of the **International Statistical 
 Classification of Diseases and Related Health Problems, 10th Revision** 
 (ICD-10) as defined by the **World Health Organization** (WHO).
@@ -13,6 +15,7 @@ from dataclasses import dataclass, field
 
 import untangle
 import requests
+from tqdm import tqdm
 
 from ._config import DATA_DIR
 from .base import ICDEntry, ICDRoot, ICDChapter, ICDBlock, ICDCategory
@@ -24,6 +27,7 @@ class ICD10Entry(ICDEntry):
     Class representing an entry in the 10th ICD revision.
     """
     revision: str = "10"
+    """Major revision of the ICD standard."""
     
     def request(
         self, 
@@ -97,7 +101,6 @@ class ICD10Entry(ICDEntry):
         return response
 
 
-
 @dataclass
 class ICD10Root(ICDRoot, ICD10Entry):
     """
@@ -105,6 +108,7 @@ class ICD10Root(ICDRoot, ICD10Entry):
     the ICD-10 codex from an XML file as provided by the WHO.
     """
     title: str = field(init=True)
+    """Title describing the codex stored under this root."""
     
     @classmethod
     def from_xml(cls, xml_title: untangle.Element) -> ICD10Root:
@@ -117,7 +121,10 @@ class ICD10Root(ICDRoot, ICD10Entry):
 
 @dataclass
 class ICD10Chapter(ICDChapter, ICD10Entry):
-    """"""
+    """
+    Subclass of the general `ICDChapter` class implementing a specialized 
+    XML parsing method for initialization.
+    """
     @classmethod
     def from_xml(
         cls, 
@@ -137,7 +144,11 @@ class ICD10Chapter(ICDChapter, ICD10Entry):
 
 @dataclass
 class ICD10Block(ICDBlock, ICD10Entry):
-    """"""
+    """
+    Class inheriting from `ICDBlock` that implements a XML parsing method 
+    as well as functionality to infer whether another block should be be a 
+    descendant of the current one.
+    """
     @classmethod
     def from_xml(cls, xml_class: untangle.Element, *args) -> ICD10Block:
         """Create a block from an XML Class element."""
@@ -187,7 +198,10 @@ class ICD10Block(ICDBlock, ICD10Entry):
 
 @dataclass
 class ICD10Category(ICDCategory, ICD10Entry):
-    """"""
+    """
+    Subclass of `ICDCategory` implementing an XML parsing classmethod for 
+    initialization from WHO's data.
+    """
     @classmethod
     def from_xml(cls, xml_class: untangle.Element, *args) -> ICD10Category:
         """Create a category from an XML Class element."""
@@ -201,9 +215,12 @@ class ICD10Category(ICDCategory, ICD10Entry):
         return category
 
 
-def get_codex(release: str = "2019", verbose: bool = False):
+def get_codex(release: str = "2019", verbose: bool = False) -> ICD10Root:
     """
-    Parse ICD-10 codex given a release year.
+    Parse ICD-10 XML codex given a release year and create an explorable tree 
+    of ICD-10 entries from it.
+    
+    Set `verbose` to `True` for progress update of data loading and parsing.
     """
     verboseprint = print if verbose else lambda *a, **k: None
     
@@ -221,7 +238,6 @@ def get_codex(release: str = "2019", verbose: bool = False):
     xml_root = untangle.parse(xml_path).ClaML
     verboseprint("SUCCESS")
     
-    verboseprint("Building ICD-10 codex tree...", end="")
     root = ICD10Root.from_xml(xml_title=xml_root.Title)
     xml_entry_dict = {}
     cls = {
@@ -231,13 +247,23 @@ def get_codex(release: str = "2019", verbose: bool = False):
     }
     # put all xml entries and ICD objects (created from that entry) into one 
     # large dictionary for easier connecting
-    for xml_class in xml_root.Class:
+    iterator = tqdm(
+        xml_root.Class, 
+        desc="Create entries and sort by code", 
+        disable=not verbose
+    )
+    for xml_class in iterator:
         xml_entry_dict[xml_class["code"]] = (
             xml_class, 
             cls[xml_class["kind"]].from_xml(xml_class, root)
         )
     
-    for code, xml_entry_tuple in xml_entry_dict.items():
+    iterator = tqdm(
+        xml_entry_dict.items(),
+        desc="Append entries to tree",
+        disable=not verbose
+    )
+    for code, xml_entry_tuple in iterator:
         xml_class, entry = xml_entry_tuple
         if hasattr(xml_class, "SubClass"):
             for subcls in xml_class.SubClass:
