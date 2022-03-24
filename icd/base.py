@@ -53,6 +53,7 @@ class ICDEntry():
                 "This package only supports ICD '10', '10-CM' or '11', not "
                 f"{self.revision}"
             )
+        return
     
     def __str__(self):
         return f"{self.kind} {self.code}: {self.title}"
@@ -248,8 +249,9 @@ class ICDRoot(ICDEntry):
     kind: str = field(repr=False, default="root")
     
     def __post_init__(self):
-        self.code = f"ICD{self.revision}"
-        self.title = f"ICD {self.revision} codex, release {self.release}"
+        tmp = super().__post_init__()
+        self.code = f"ICD-{self.revision}"
+        return tmp
     
     @property
     def chapter(self) -> ICDChapter:
@@ -272,12 +274,21 @@ class ICDChapter(ICDEntry):
     
     def __post_init__(self):
         """Romanize chapter number and get release from root."""
-        super().__post_init__()
+        tmp = super().__post_init__()
         
         units     = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX']
         tens      = ['', 'X', 'XX', 'XXX', 'XL', 'L', 'LX', 'LXX', 'LXXX', 'XC']
         hundrets  = ['', 'C', 'CC', 'CCC', 'CD', 'D', 'DC', 'DCC', 'DCCC', 'CM']
         thousands = ['', 'M', 'MM', 'MMM']
+        roman_letters = [*units[1:], *tens[1:], *hundrets[1:], *thousands[1:]]
+        
+        if (
+            type(self.code) == str 
+            and 
+            all([c in roman_letters for c in self.code])
+        ):
+            return tmp
+        
         try:
             chapter_num = int(self.code)
         except ValueError:
@@ -290,6 +301,8 @@ class ICDChapter(ICDEntry):
         chapter_num = chapter_num % 10
         roman_num += units[chapter_num]
         self.code = roman_num
+        
+        return tmp
     
     @property
     def block(self) -> Dict[str, ICDBlock]:

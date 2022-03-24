@@ -1,3 +1,12 @@
+"""
+This is an independent python implementation of the **International Statistical 
+Classification of Diseases and Related Health Problems, 10th Revision** 
+(ICD-10) as defined by the **World Health Organization** (WHO).
+
+The data files are obtained from the WHO's [download area](https://apps.who.int/classifications/apps/icd/ClassificationDownload/DLArea/Download.aspx), 
+which requires one to be logged in to access the underlying files.
+"""
+from __future__ import annotations
 import os
 from typing import Optional
 from dataclasses import dataclass, field
@@ -5,6 +14,7 @@ from dataclasses import dataclass, field
 import untangle
 import requests
 
+from ._config import DATA_DIR
 from .base import ICDEntry, ICDRoot, ICDChapter, ICDBlock, ICDCategory
 
 
@@ -90,16 +100,156 @@ class ICD10Entry(ICDEntry):
 
 @dataclass
 class ICD10Root(ICDRoot, ICD10Entry):
-    """"""
+    """
+    Subclass of the base `ICDRoot` that implements a method `from_xml` to load 
+    the ICD-10 codex from an XML file as provided by the WHO.
+    """
+    title: str = field(init=True)
+    
+    @classmethod
+    def from_xml(cls, xml_title: untangle.Element) -> ICD10Root:
+        """Create root from XML Title element."""
+        root = cls(
+            title=xml_title.cdata,
+            _release=xml_title["version"]
+        )
+        return root
 
 @dataclass
 class ICD10Chapter(ICDChapter, ICD10Entry):
     """"""
+    @classmethod
+    def from_xml(
+        cls, 
+        xml_class: untangle.Element, 
+        root: ICD10Root
+    ) -> ICD10Chapter:
+        """Create a chapter from an XML Class element."""
+        for r in xml_class.Rubric:
+            if r["kind"] == "preferred":
+                preferred_title = r.Label.cdata
+        chapter = cls(
+            code=xml_class["code"],
+            title=preferred_title
+        )
+        root.add_child(chapter)
+        return chapter
 
 @dataclass
 class ICD10Block(ICDBlock, ICD10Entry):
     """"""
+    @classmethod
+    def from_xml(cls, xml_class: untangle.Element, *args) -> ICD10Block:
+        """Create a block from an XML Class element."""
+        for r in xml_class.Rubric:
+            if r["kind"] == "preferred":
+                preferred_title = r.Label.cdata
+        block = cls(
+            code=xml_class["code"],
+            title=preferred_title
+        )
+        return block
+    
+    @property
+    def start_code(self) -> str:
+        """Returns the first ICD code included in this block."""
+        return self.code.split("-")[0]
+    
+    @property
+    def end_code(self) -> str:
+        """Respectively returns the last ICD code of the block."""
+        split_code = self.code.split("-")
+        if len(split_code) == 1:
+            return self.start_code
+        elif len(split_code) == 2:
+            return split_code[1]
+        else:
+            raise ValueError(
+                "Block code must be <start_code>-<end_code> or only <code>, "
+                f"but not {self.code}"
+            )
+
+    def should_contain(self, block: ICD10Block) -> bool:
+        """Check whether this block should contain the given block"""
+        if not isinstance(block, ICD10Block):
+            return False
+        
+        if self == block:
+            return False
+        
+        has_start_ge = block.start_code >= self.start_code
+        has_end_le = block.end_code <= self.end_code
+        if has_start_ge and has_end_le:
+            return True
+        
+        return False
+    
 
 @dataclass
 class ICD10Category(ICDCategory, ICD10Entry):
     """"""
+    @classmethod
+    def from_xml(cls, xml_class: untangle.Element, *args) -> ICD10Category:
+        """Create a category from an XML Class element."""
+        for r in xml_class.Rubric:
+            if r["kind"] == "preferred":
+                preferred_title = r.Label.cdata
+        category = cls(
+            code=xml_class["code"],
+            title=preferred_title
+        )
+        return category
+
+
+def get_codex(release: str = "2019", verbose: bool = False):
+    """
+    Parse ICD-10 codex given a release year.
+    """
+    verboseprint = print if verbose else lambda *a, **k: None
+    
+    xml_path = os.path.join(
+        DATA_DIR, "icd-10/", f"icd10{release}en.xml"
+    )
+    
+    verboseprint(f"Looking for XML file at {xml_path}...", end="")
+    if not os.path.exists(xml_path):
+        verboseprint("FAILED")
+        raise IOError(f"File {xml_path} does not exist")
+    verboseprint("FOUND")
+    
+    verboseprint("Parsing XML...", end="")
+    xml_root = untangle.parse(xml_path).ClaML
+    verboseprint("SUCCESS")
+    
+    verboseprint("Building ICD-10 codex tree...", end="")
+    root = ICD10Root.from_xml(xml_title=xml_root.Title)
+    xml_entry_dict = {}
+    cls = {
+        "chapter": ICD10Chapter, 
+        "block": ICD10Block, 
+        "category": ICD10Category
+    }
+    # put all xml entries and ICD objects (created from that entry) into one 
+    # large dictionary for easier connecting
+    for xml_class in xml_root.Class:
+        xml_entry_dict[xml_class["code"]] = (
+            xml_class, 
+            cls[xml_class["kind"]].from_xml(xml_class, root)
+        )
+    
+    for code, xml_entry_tuple in xml_entry_dict.items():
+        xml_class, entry = xml_entry_tuple
+        if hasattr(xml_class, "SubClass"):
+            for subcls in xml_class.SubClass:
+                sub_xml, sub_entry = xml_entry_dict[subcls["code"]]
+                has_supercls = hasattr(sub_xml, "SuperClass")
+                if has_supercls and sub_xml.SuperClass["code"] != entry.code:
+                    raise RuntimeError(
+                        "Parent code of child that is supposed to be added "
+                        "does not match current entry"
+                    )
+                entry.add_child(sub_entry)
+    verboseprint("DONE")
+    
+    return root
+    

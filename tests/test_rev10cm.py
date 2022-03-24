@@ -5,7 +5,8 @@ import icd
 from icd.base import ICDChapter, ICDEntry
 
 
-def test_codex(release="2022"):
+@pytest.mark.parametrize("release", ["2019", "2020", "2021", "2022"])
+def test_codex(release):
     codex = icd.rev10cm.get_codex(release=release)
     
     assert isinstance(codex, icd.rev10cm.ICD10CMRoot), (

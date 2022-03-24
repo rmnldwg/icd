@@ -1,3 +1,14 @@
+"""
+This independently developed python module implements the **International 
+Classification of Diseases, tenth revision, Clinical Modification** (ICD-10-CM) 
+as defined by the **Centers for Disease Control and Prevention** (CDC).
+
+It differs slightly from the ICD-10 as defined by the WHO, namely in the 
+following ways:
+1. It publishes releases every year
+2. Those releases are published openly at its [download area](https://ftp.cdc.gov/pub/Health_Statistics/NCHS/Publications/ICD10CM/)
+3. The CDC provides its own easy-to-use [API](https://clinicaltables.nlm.nih.gov/apidoc/icd10cm/v3/doc.html)
+"""
 from __future__ import annotations
 import os
 from dataclasses import dataclass, field
@@ -16,13 +27,13 @@ from .rev10 import (
 @dataclass
 class ICD10CMEntry(ICD10Entry):
     """
-    Class representing an entry in the ICD 10-CM system.
+    Class representing an entry in the ICD-10-CM system.
     """
     revision: str = "10-CM"
     
     def request(self):
         """
-        Return information on an entry of the ICD 10-CM from the CDC's API.
+        Return information on an entry of the ICD-10-CM from the CDC's API.
         
         No authentication is needed to access this API.
         """
@@ -46,11 +57,25 @@ class ICD10CMEntry(ICD10Entry):
 
 @dataclass
 class ICD10CMRoot(ICD10Root, ICD10CMEntry):
-    """"""
+    """
+    This subclass of `ICD10Root` implements its own `from_xml` method, because 
+    the way the CDC and the WHO make their XML data available differs.
+    """
+    title: str = field(init=False)
+    
+    def __post_init__(self):
+        tmp = super().__post_init__()
+        self.title = (
+            "International Classification of Diseases, Tenth Revision, "
+            f"Clinical Modification, {self.release} release")
+        return tmp
     
     @classmethod
     def from_xml(cls, xml_root: untangle.Element) -> ICD10CMRoot:
-        """Create root and entire ICD tree from XML root entry."""
+        """
+        Create root and entire ICD-10-CM tree from the root entry in the 
+        CDC's XML files.
+        """
         root = cls(_release=xml_root.version.cdata)        
         for xml_chapter in xml_root.chapter:
             root.add_child(ICD10CMChapter.from_xml(xml_chapter))
@@ -76,7 +101,7 @@ class ICD10CMBlock(ICD10Block, ICD10CMEntry):
     """"""
     @classmethod
     def from_xml(cls, xml_section: untangle.Element) -> ICD10Block:
-        """Create block of ICD 10-CM categories from XML section"""
+        """Create block of ICD-10-CM categories from XML section"""
         block = cls(
             code=xml_section["id"],
             title=xml_section.desc.cdata,
@@ -86,40 +111,7 @@ class ICD10CMBlock(ICD10Block, ICD10CMEntry):
                 block.add_child(ICD10CMCategory.from_xml(xml_diag))
         
         return block
-    
-    @property
-    def start_code(self) -> str:
-        """Returns the first ICD code included in this block."""
-        return self.code.split("-")[0]
-            
-    @property
-    def end_code(self) -> str:
-        """Respectively returns the last ICD code of the block."""
-        split_code = self.code.split("-")
-        if len(split_code) == 1:
-            return self.start_code
-        elif len(split_code) == 2:
-            return split_code[1]
-        else:
-            raise ValueError(
-                "Block code must be <start_code>-<end_code> or only <code>, "
-                f"but not {self.code}"
-            )
 
-    def should_contain(self, block: ICD10Block) -> bool:
-        """Check whether this block should contain the given block"""
-        if not isinstance(block, ICD10Block):
-            return False
-        
-        if self == block:
-            return False
-        
-        has_start_ge = block.start_code >= self.start_code
-        has_end_le = block.end_code <= self.end_code
-        if has_start_ge and has_end_le:
-            return True
-        
-        return False
 
 @dataclass
 class ICD10CMCategory(ICD10Category, ICD10CMEntry):
@@ -144,7 +136,7 @@ def get_codex(
     verbose: bool = False
 ) -> ICD10CMRoot:
     """
-    Parse ICD 10-CM codex of given release. Download respective data if 
+    Parse ICD-10-CM codex of given release. Download respective data if 
     necessary.
     
     The `release` argument refers to the fiscal year the data was released and 
@@ -156,7 +148,9 @@ def get_codex(
     """
     verboseprint = print if verbose else lambda *a, **k: None
     
-    xml_path = os.path.join(DATA_DIR, f"icd10cm_tabular_{release}.xml")
+    xml_path = os.path.join(
+        DATA_DIR, "icd-10-cm/",f"icd10cm_tabular_{release}.xml"
+    )
     
     verboseprint(f"Looking for XML file at {xml_path}...", end="")
     if not os.path.exists(xml_path) and download:
@@ -217,7 +211,9 @@ def download_from_CDC(
     if save_path is not None and not os.path.exists(save_path):
         raise IOError(f"No such directory: {save_path}")
     else:
-        save_path = os.path.join(DATA_DIR, f"icd10cm_tabular_{release}.xml")
+        save_path = os.path.join(
+            DATA_DIR, "icd-10-cm/", f"icd10cm_tabular_{release}.xml"
+        )
     verboseprint("SUCCESS")
     
     total_size = int(response.headers.get("content-length", 0))
