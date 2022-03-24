@@ -1,0 +1,32 @@
+import pytest
+import hypothesis.strategies as st
+
+import icd
+from icd.base import ICDChapter, ICDEntry
+
+
+def test_codex(release="2022"):
+    codex = icd.rev10cm.get_codex(release=release)
+    
+    assert isinstance(codex, icd.rev10cm.ICD10CMRoot), (
+        "`get_codex()` did not return root object"
+    )
+    assert all([isinstance(child, ICDChapter) for child in codex.children]), (
+        "Children of root must be chapters"
+    )
+    len_codex = len(codex)
+    assert len_codex > 1, (
+        "Codex contains only root entry"
+    )
+    assert len_codex == len(list(codex.entries)), (
+        "`len` does not seem to report number of entries"
+    )
+    assert len_codex >= len(list(codex.leaves)), (
+        "Codex must have more entries than leaves"
+    )
+    assert all([leaf.is_leaf for leaf in codex.leaves]), (
+        "Iterator over leaves returned objects that aren't leaves"
+    )
+    assert all([isinstance(entry, ICDEntry) for entry in codex.entries]), (
+        "Not all entries are ICD objects"
+    )
