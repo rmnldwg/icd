@@ -5,8 +5,10 @@ This is an independent python implementation of the **International Statistical
 Classification of Diseases and Related Health Problems, 10th Revision** 
 (ICD-10) as defined by the **World Health Organization** (WHO).
 
-The data files are obtained from the WHO's [download area](https://apps.who.int/classifications/apps/icd/ClassificationDownload/DLArea/Download.aspx), 
+The data files are obtained from the WHO's [download area][WHO download], 
 which requires one to be logged in to access the underlying files.
+
+[WHO download]: https://apps.who.int/classifications/apps/icd/ClassificationDownload/DLArea/Download.aspx
 """
 from __future__ import annotations
 import os
@@ -119,7 +121,7 @@ class ICD10Root(ICDRoot, ICD10Entry):
         )
         return root
 
-@dataclass
+
 class ICD10Chapter(ICDChapter, ICD10Entry):
     """
     Subclass of the general `ICDChapter` class implementing a specialized 
@@ -142,7 +144,7 @@ class ICD10Chapter(ICDChapter, ICD10Entry):
         root.add_child(chapter)
         return chapter
 
-@dataclass
+
 class ICD10Block(ICDBlock, ICD10Entry):
     """
     Class inheriting from `ICDBlock` that implements a XML parsing method 
@@ -196,7 +198,7 @@ class ICD10Block(ICDBlock, ICD10Entry):
         return False
     
 
-@dataclass
+
 class ICD10Category(ICDCategory, ICD10Entry):
     """
     Subclass of `ICDCategory` implementing an XML parsing classmethod for 

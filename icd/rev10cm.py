@@ -8,8 +8,11 @@ as defined by the **Centers for Disease Control and Prevention** (CDC).
 It differs slightly from the ICD-10 as defined by the WHO, namely in the 
 following ways:
 1. It publishes releases every year
-2. Those releases are published openly at its [download area](https://ftp.cdc.gov/pub/Health_Statistics/NCHS/Publications/ICD10CM/)
-3. The CDC provides its own easy-to-use [API](https://clinicaltables.nlm.nih.gov/apidoc/icd10cm/v3/doc.html)
+2. Those releases are published openly at its [download area][CDC download]
+3. The CDC provides its own easy-to-use [API][CDC API]
+
+[CDC download]: https://ftp.cdc.gov/pub/Health_Statistics/NCHS/Publications/ICD10CM/
+[CDC API]:      https://clinicaltables.nlm.nih.gov/apidoc/icd10cm/v3/doc.html
 """
 from __future__ import annotations
 import os
@@ -69,7 +72,8 @@ class ICD10CMRoot(ICD10Root, ICD10CMEntry):
         tmp = super().__post_init__()
         self.title = (
             "International Classification of Diseases, Tenth Revision, "
-            f"Clinical Modification, {self.release} release")
+            f"Clinical Modification, {self.release} release"
+        )
         return tmp
     
     @classmethod
@@ -83,7 +87,7 @@ class ICD10CMRoot(ICD10Root, ICD10CMEntry):
             root.add_child(ICD10CMChapter.from_xml(xml_chapter))
         return root
 
-@dataclass
+
 class ICD10CMChapter(ICD10Chapter, ICD10CMEntry):
     """"""    
     @classmethod
@@ -98,7 +102,7 @@ class ICD10CMChapter(ICD10Chapter, ICD10CMEntry):
         
         return chapter
 
-@dataclass
+
 class ICD10CMBlock(ICD10Block, ICD10CMEntry):
     """"""
     @classmethod
@@ -115,7 +119,6 @@ class ICD10CMBlock(ICD10Block, ICD10CMEntry):
         return block
 
 
-@dataclass
 class ICD10CMCategory(ICD10Category, ICD10CMEntry):
     """"""
     @classmethod
@@ -197,7 +200,7 @@ def download_from_CDC(
     else:
         url = (
             "https://ftp.cdc.gov/pub/Health_Statistics/NCHS/Publications/"
-            f"ICDCM/{release}/icd10cm_tabular_{release}.xml"
+            f"ICD10CM/{release}/icd10cm_tabular_{release}.xml"
         )
     
     verboseprint("Requesting file from URL...", end="")
@@ -212,9 +215,13 @@ def download_from_CDC(
     verboseprint("Preparing save directory...", end="")
     if save_path is not None and not os.path.exists(save_path):
         raise IOError(f"No such directory: {save_path}")
-    else:
+    elif save_path is None:
         save_path = os.path.join(
             DATA_DIR, "icd-10-cm/", f"icd10cm_tabular_{release}.xml"
+        )
+    else:
+        save_path = os.path.join(
+            save_path, f"icd10cm_tabular_{release}.xml"
         )
     verboseprint("SUCCESS")
     
