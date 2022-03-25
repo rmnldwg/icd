@@ -27,6 +27,7 @@ class ICDEntry():
     """The chapter number, block range or ICD code of the entry."""
     title: str
     """Description of the chapter, block or category."""
+    revision: str = field(init=False)
     kind: str = field(repr=False, default="entry")
     """Can be `entry`, `root`, `chapter`, `block` or `category`."""
     parent: Optional[ICDEntry] = field(
@@ -211,30 +212,42 @@ class ICDEntry():
             if child.parent == self:
                 child.parent = None
     
-    def find(self, code: str, maxdepth: Optional[int] = None) -> ICDEntry:
+    def search(self, code: str, maxdepth: Optional[int] = None) -> List[ICDEntry]:
         """
-        Find a given code in the tree.
+        Search a given code in the tree.
         
         The argument `code` can be a chapter number, block range or actual ICD 
-        code of a disease.
-        
+        code of a disease. It may even only be a part of an ICD code. 
         `maxdepth` is the maximum recusion depth the method will go into for 
         the search.
         
-        It returns the entry (chapter, block, category) if found, else `None`.
+        It returns the a list of entries that match the given code.
         """
-        if self.code == code:
-            return self
+        res = []
+        
+        if code in self.code:
+            res = [self]
         
         if maxdepth is not None and maxdepth < 1:
-            return None
+            return []
         
         for child in self.children:
             new_maxdepth = maxdepth - 1 if maxdepth is not None else None
-            if (found := child.find(code, maxdepth=new_maxdepth)) is not None:
-                return found
+            res = [*res, *child.search(code, maxdepth=new_maxdepth)]
+        return res
+    
+    def exists(self, code: str, maxdepth: Optional[int] = None) -> bool:
+        """
+        Check if a given code exists in the codex tree.
+        """
+        if self.code == code:
+            return True
         
-        return None
+        if maxdepth is not None and maxdepth < 1:
+            return False
+        
+        maxdepth = maxdepth - 1 if maxdepth is not None else None
+        return any([child.exists(code, maxdepth) for child in self.children])
 
 
 @dataclass

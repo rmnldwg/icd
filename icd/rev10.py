@@ -119,7 +119,7 @@ class ICD10Root(ICDRoot, ICD10Entry):
         )
         return root
 
-@dataclass
+
 class ICD10Chapter(ICDChapter, ICD10Entry):
     """
     Subclass of the general `ICDChapter` class implementing a specialized 
@@ -142,7 +142,7 @@ class ICD10Chapter(ICDChapter, ICD10Entry):
         root.add_child(chapter)
         return chapter
 
-@dataclass
+
 class ICD10Block(ICDBlock, ICD10Entry):
     """
     Class inheriting from `ICDBlock` that implements a XML parsing method 
@@ -196,7 +196,7 @@ class ICD10Block(ICDBlock, ICD10Entry):
         return False
     
 
-@dataclass
+
 class ICD10Category(ICDCategory, ICD10Entry):
     """
     Subclass of `ICDCategory` implementing an XML parsing classmethod for 
