@@ -5,15 +5,24 @@ import hypothesis
 from hypothesis import given, assume, settings
 import hypothesis.strategies as st
 import untangle
+import requests
 
 import icd
 from icd.base import ICDChapter, ICDEntry
-from icd.rev10cm import ICD10CMBlock, ICD10CMChapter, ICD10CMRoot, download_from_CDC
+from icd.rev10cm import (
+    ICD10CMRoot, 
+    ICD10CMChapter, 
+    ICD10CMBlock, 
+    ICD10CMCategory,
+    download_from_CDC,
+    get_codex
+)
 
 
 @pytest.fixture(params=["2019", "2020", "2021", "2022"], scope="session")
 def codex(request):
     return icd.rev10cm.get_codex(release=request.param)
+
 
 @given(
     chapter_num=st.integers(1,3000),
@@ -23,21 +32,20 @@ def codex(request):
 )
 @settings(suppress_health_check=hypothesis.HealthCheck.all())
 def test_entry(chapter_num, start_code, mid_code, end_code):
+    """
+    Test basic functionalities of the individual ICD-10-CM entries.
+    """
     assume(start_code <= mid_code < end_code)
     release = "testrelease"
-    root = icd.rev10cm.ICD10CMRoot(_release=release)
-    chapter = icd.rev10cm.ICD10Chapter(chapter_num, "Test Chapter")
-    block = icd.rev10cm.ICD10Block(
-        code=f"{start_code}-{end_code}", 
-        title="Test Block"
+    root = ICD10CMRoot(_release=release)
+    chapter = ICD10CMChapter(chapter_num, "Test Chapter")
+    block = ICD10CMBlock(code=f"{start_code}-{end_code}", title="Test Block")
+    sub_block1 = ICD10CMBlock(code=mid_code, title="Test Subblock 1")
+    sub_block2 = ICD10CMBlock(
+        code=chr(ord(mid_code) + 1), 
+        title="Test Subblock 2"
     )
-    sub_block1 = icd.rev10cm.ICD10CMBlock(
-        code=mid_code, title="Test Subblock 1"
-    )
-    sub_block2 = icd.rev10cm.ICD10CMBlock(
-        code=chr(ord(mid_code) + 1), title="Test Subblock 2"
-    )
-    category = icd.rev10cm.ICD10CMCategory(f"{mid_code}.1", "Test category")
+    category = ICD10CMCategory(f"{mid_code}.1", "Test category")
     
     root.add_child(chapter)
     chapter.add_child(block)
@@ -114,7 +122,24 @@ def test_entries(codex):
         assert num_lines == len(list(entry.entries)), (
             "Tree must list all entries under current"
         )
-        
+
+
+def test_request(codex):
+    """Test whether the ICD API request works."""
+    leaves = list(codex.leaves)
+    leaf_subset = random.sample(leaves, k=10)
+    
+    for leaf in leaf_subset:
+        response_list = leaf.request()
+        for response in response_list:
+            assert leaf.code in response[0], (
+                "Responded code not same as leaf code"
+            )
+            assert leaf.title in response[1], (
+                "Responded title not same as leaf title"
+            )
+
+
 def test_root(codex):
     root = codex
     assert isinstance(root, ICD10CMRoot), "Root must be `ICD10CMRoot` object."
@@ -136,6 +161,7 @@ def test_root(codex):
     for code, chapter in root.chapter.items():
         assert chapter.code == code, "Chapter dict of root incorrect"
 
+
 def test_chapter(codex):
     chapters = codex.children
     for chapter in chapters:
@@ -153,17 +179,19 @@ def test_chapter(codex):
         for code, block in chapter.block.items():
             assert block.code == code, "Block dict of chapter incorrect"
 
-def test_codex(codex):    
-    assert isinstance(codex, icd.rev10cm.ICD10CMRoot), (
+
+def test_codex(codex):
+    """
+    Test some core functionalities of a loaded codex.
+    """
+    assert isinstance(codex, ICD10CMRoot), (
         "`get_codex()` did not return root object"
     )
     assert all([isinstance(child, ICDChapter) for child in codex.children]), (
         "Children of root must be chapters"
     )
     len_codex = len(codex)
-    assert len_codex > 1, (
-        "Codex contains only root entry"
-    )
+    assert len_codex > 1, "Codex contains only root entry"
     assert len_codex == len(list(codex.entries)), (
         "`len` does not seem to report number of entries"
     )
@@ -180,13 +208,22 @@ def test_codex(codex):
 
 @pytest.mark.parametrize("release", ["2019", "2020", "2021", "2022"])
 def test_download_from_CDC(tmpdir, release):
+    """
+    Make sure downloading from the CDC website works.
+    """
+    with pytest.raises(requests.RequestException):
+        download_from_CDC(custom_url="https://made.up/file.xml")
+    
+    with pytest.raises(IOError):
+        download_from_CDC(save_path="/made/up/path")
+    
     download_from_CDC(release=release, save_path=tmpdir)
     tmp_file_path = tmpdir / f"icd10cm_tabular_{release}.xml"
     assert os.path.exists(str(tmp_file_path)), (
         f"Temporary directory {tmp_file_path} does not exist"
     )
     xml_root = untangle.parse(tmp_file_path).ICD10CM_tabular
-    codex = icd.rev10cm.ICD10CMRoot.from_xml(xml_root)
-    assert isinstance(codex, icd.rev10cm.ICD10CMRoot), (
+    codex = ICD10CMRoot.from_xml(xml_root)
+    assert isinstance(codex, ICD10CMRoot), (
         "Codex was not created"
     )
