@@ -5,8 +5,10 @@ This is an independent python implementation of the **International Statistical
 Classification of Diseases and Related Health Problems, 10th Revision** 
 (ICD-10) as defined by the **World Health Organization** (WHO).
 
-The data files are obtained from the WHO's [download area](https://apps.who.int/classifications/apps/icd/ClassificationDownload/DLArea/Download.aspx), 
+The data files are obtained from the WHO's [download area][WHO download], 
 which requires one to be logged in to access the underlying files.
+
+[WHO download]: https://apps.who.int/classifications/apps/icd/ClassificationDownload/DLArea/Download.aspx
 """
 from __future__ import annotations
 import os

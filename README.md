@@ -118,13 +118,17 @@ block L00-L08: Infections of the skin and subcutaneous tissue
     └───category L08.9: Local infection of skin and subcutaneous tissue, unspecified
 ```
 
-Similarily, but the other way around, one can print the ancestry of any given entry:
+It is also possible to search for codes or even just parts of codes using the `search()` method. It always returns a list of found entries.
 
 ```python
-print(icd10_codex.find("C32.1").ancestry())
+# get category by ICD code
+cat = icd10_codex.search("C32.1")[0]
+
+# print acnestry of category
+print(cat.ancestry())
 ```
 
-returns
+The `ancestry()` function prints out the ancestors of a given entry, in contrast to the `tree()`, which prints the descendants. The above code will output this:
 
 ```text
 root ICD-10: International Statistical Classification of Diseases and Related Health Problems 10th Revision
@@ -135,6 +139,8 @@ root ICD-10: International Statistical Classification of Diseases and Related He
                 └───category C32: Malignant neoplasm of larynx
                     └───category C32.1: Supraglottis
 ```
+
+Finally, it's possible to check if a specific code exists using the `exists()` method.
 
 ***
 

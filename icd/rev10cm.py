@@ -8,8 +8,11 @@ as defined by the **Centers for Disease Control and Prevention** (CDC).
 It differs slightly from the ICD-10 as defined by the WHO, namely in the 
 following ways:
 1. It publishes releases every year
-2. Those releases are published openly at its [download area](https://ftp.cdc.gov/pub/Health_Statistics/NCHS/Publications/ICD10CM/)
-3. The CDC provides its own easy-to-use [API](https://clinicaltables.nlm.nih.gov/apidoc/icd10cm/v3/doc.html)
+2. Those releases are published openly at its [download area][CDC download]
+3. The CDC provides its own easy-to-use [API][CDC API]
+
+[CDC download]: https://ftp.cdc.gov/pub/Health_Statistics/NCHS/Publications/ICD10CM/
+[CDC API]:      https://clinicaltables.nlm.nih.gov/apidoc/icd10cm/v3/doc.html
 """
 from __future__ import annotations
 import os
