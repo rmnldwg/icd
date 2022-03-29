@@ -83,6 +83,24 @@ class ICDEntry():
             self._release = new_release
     
     @property
+    def is_root(self) -> bool:
+        return self.parent is None
+    
+    def get_root(self) -> ICDRoot:
+        """Recursively find the root of the ICD codex from any entry."""
+        if self.is_root:
+            return self
+        else:
+            return self.parent.get_root()
+    
+    @property
+    def depth(self):
+        if self.is_root:
+            return 1
+        else:
+            return 1 + self.parent.depth
+    
+    @property
     def is_leaf(self) -> bool:
         return len(self.children) == 0
     
@@ -107,17 +125,6 @@ class ICDEntry():
             yield from child.entries
     
     @property
-    def is_root(self) -> bool:
-        return self.parent is None
-    
-    def get_root(self) -> ICDRoot:
-        """Recursively find the root of the ICD codex from any entry."""
-        if self.is_root:
-            return self
-        else:
-            return self.parent.get_root()
-    
-    @property
     def depth_in_kind(self):
         """
         A `depth_in_kind` of 1 indicates that the parent of this entry is of 
@@ -133,7 +140,7 @@ class ICDEntry():
     def _child_dict(self) -> Dict[str, ICDEntry]:
         return {child.code: child for child in self.children}
     
-    def tree(self, prefix="", maxdepth=None):
+    def tree(self, prefix="", maxdepth: Optional[int] = None):
         """
         Render the current object and all descendants in a pretty tree.
         
@@ -148,10 +155,8 @@ class ICDEntry():
         """
         tree_str = f"{str(self)}\n"
         
-        if isinstance(maxdepth, int) and maxdepth < 1:
+        if maxdepth is not None and maxdepth <= self.depth:
             return tree_str
-        elif isinstance(maxdepth, int):
-            maxdepth = maxdepth - 1
         
         num_children = len(self.children)
         for i,child in enumerate(self.children):
@@ -173,8 +178,8 @@ class ICDEntry():
             return str(self) + "\n"
         else:
             ancestry_str = self.parent.ancestry()
-            nlines = ancestry_str.count("\n")
-            return ancestry_str + (nlines - 1) * "    " + "└───" + str(self) + "\n"
+            n = self.depth - 2
+            return ancestry_str + n * "    " + "└───" + str(self) + "\n"
              
     def add_child(self, new_child: ICDEntry):
         """
@@ -228,12 +233,11 @@ class ICDEntry():
         if code in self.code:
             res = [self]
         
-        if maxdepth is not None and maxdepth < 1:
+        if maxdepth is not None and maxdepth <= self.depth:
             return []
         
         for child in self.children:
-            new_maxdepth = maxdepth - 1 if maxdepth is not None else None
-            res = [*res, *child.search(code, maxdepth=new_maxdepth)]
+            res = [*res, *child.search(code, maxdepth=maxdepth)]
         return res
     
     def exists(self, code: str, maxdepth: Optional[int] = None) -> bool:
@@ -243,11 +247,30 @@ class ICDEntry():
         if self.code == code:
             return True
         
-        if maxdepth is not None and maxdepth < 1:
+        if maxdepth is not None and maxdepth <= self.depth:
             return False
         
-        maxdepth = maxdepth - 1 if maxdepth is not None else None
         return any([child.exists(code, maxdepth) for child in self.children])
+    
+    def get(
+        self, 
+        code: str, 
+        maxdepth: Optional[int] = None,
+        kind: str = "category",
+    ) -> ICDCategory:
+        """
+        Return the ICD category with the given code if it exists.
+        """
+        if self.code == code and self.kind == kind:
+            return self
+        
+        if maxdepth is not None and maxdepth <= self.depth:
+            return None
+        
+        for child in self.children:
+            if (category := child.get(code, maxdepth)) is not None:
+                return category
+
 
 
 @dataclass
