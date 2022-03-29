@@ -4,17 +4,8 @@ for the International statistical classification of diseases and related health
 problems (10th revision).
 """
 from __future__ import annotations
-from multiprocessing.sharedctypes import Value
-import os
 from dataclasses import dataclass, field
-from platform import release
 from typing import List, Optional, Dict
-
-import untangle
-import requests
-from tqdm import tqdm
-
-from ._config import DATA_DIR
 
 
 @dataclass
@@ -146,23 +137,27 @@ class ICDEntry():
     def _child_dict(self) -> Dict[str, ICDEntry]:
         return {child.code: child for child in self.children}
     
-    def tree(self, prefix="", maxdepth: Optional[int] = None):
+    def tree(
+        self, 
+        prefix="", 
+        maxdepth: Optional[int] = None, 
+        print_out: bool = True
+    ):
         """
-        Render the current object and all descendants in a pretty tree.
+        Print or return the current object and all descendants in a pretty tree.
         
         With `maxdepth` one can choose up to which depth of the tree the output 
         should be rendered.
         
-        To display the output nicely, put it in a `print` statement lie so:
-        
-        ```python
-        print(codex.tree(maxdepth=2))
-        ```
+        `print_out=False` will only return the string with the rendered tree, 
+        while setting it to `True` (default) will directly print it out.
         """
-        tree_str = f"{str(self)}\n"
+        treeprint = print if print_out else lambda x: x
+        
+        res = f"{str(self)}\n"
         
         if maxdepth is not None and maxdepth <= self.depth:
-            return tree_str
+            return treeprint(res)
         
         num_children = len(self.children)
         for i,child in enumerate(self.children):
@@ -172,20 +167,33 @@ class ICDEntry():
             else:
                 branch = "├───"
                 new_prefix = prefix + "│   "
-            tree_str += prefix + branch + child.tree(new_prefix, maxdepth)
-        return tree_str
+            res += (
+                prefix 
+                + branch 
+                + child.tree(new_prefix, maxdepth, print_out=False)
+            )
+        return treeprint(res)
     
-    def ancestry(self):
+    def ancestry(self, print_out: bool = True):
         """
-        Render ancestry from root directly to the current entry. Like with the 
-        `tree()` method, this should be put inside a `print()` statement.
+        Print or return ancestry from root directly to the current entry.
+        
+        If `print_out` is set to `True`, the ancestry will be printed directly. 
+        Otherwise the string will just be returned.
         """
+        ancestryprint = print if print_out else lambda x: x
+        
         if self.is_root:
-            return str(self) + "\n"
+            return ancestryprint(str(self) + "\n")
         else:
-            ancestry_str = self.parent.ancestry()
             n = self.depth - 2
-            return ancestry_str + n * "    " + "└───" + str(self) + "\n"
+            return ancestryprint(
+                self.parent.ancestry(print_out=False) 
+                + n * "    " 
+                + "└───" 
+                + str(self) 
+                + "\n"
+            )
              
     def add_child(self, new_child: ICDEntry):
         """

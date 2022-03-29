@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 
 import untangle
 import requests
-from tqdm import tqdm
+from rich.progress import track
 
 from ._config import DATA_DIR
 from .base import ICDEntry, ICDRoot, ICDChapter, ICDBlock, ICDCategory
@@ -249,9 +249,9 @@ def get_codex(release: str = "2019", verbose: bool = False) -> ICD10Root:
     }
     # put all xml entries and ICD objects (created from that entry) into one 
     # large dictionary for easier connecting
-    iterator = tqdm(
+    iterator = track(
         xml_root.Class, 
-        desc="Create entries and sort by code", 
+        description="Create entries and sort by code", 
         disable=not verbose
     )
     for xml_class in iterator:
@@ -260,10 +260,10 @@ def get_codex(release: str = "2019", verbose: bool = False) -> ICD10Root:
             cls[xml_class["kind"]].from_xml(xml_class, root)
         )
     
-    iterator = tqdm(
+    iterator = track(
         xml_entry_dict.items(),
-        desc="Append entries to tree",
-        disable=not verbose
+        description="Append entries to tree",
+        disable=not verbose, 
     )
     for code, xml_entry_tuple in iterator:
         xml_class, entry = xml_entry_tuple
