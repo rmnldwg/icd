@@ -84,6 +84,10 @@ class ICDEntry():
     
     @property
     def is_root(self) -> bool:
+        """
+        Only `True` for the `ICDRoot` element that is at the top of the codex 
+        tree.
+        """
         return self.parent is None
     
     def get_root(self) -> ICDRoot:
@@ -95,6 +99,7 @@ class ICDEntry():
     
     @property
     def depth(self):
+        """Return the depth of the entry in the codex tree."""
         if self.is_root:
             return 1
         else:
@@ -102,6 +107,7 @@ class ICDEntry():
     
     @property
     def is_leaf(self) -> bool:
+        """An entry is a leaf if it has no children."""
         return len(self.children) == 0
     
     @property
@@ -242,7 +248,10 @@ class ICDEntry():
     
     def exists(self, code: str, maxdepth: Optional[int] = None) -> bool:
         """
-        Check if a given code exists in the codex tree.
+        Check if a given `code` exists in the codex tree.
+        
+        With `maxdepth` you can choose how deep the method goes down the tree 
+        for the search.
         """
         if self.code == code:
             return True
@@ -257,9 +266,13 @@ class ICDEntry():
         code: str, 
         maxdepth: Optional[int] = None,
         kind: str = "category",
-    ) -> ICDCategory:
+    ) -> ICDEntry:
         """
-        Return the ICD category with the given code if it exists.
+        Return the ICD category with the given `code` that is of the specified 
+        `kind` if it exists.
+        
+        Set `maxdepth` to the maximum depth you want to go down the tree for 
+        the search.
         """
         if self.code == code and self.kind == kind:
             return self
