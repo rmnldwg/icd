@@ -21,7 +21,7 @@ from typing import Optional
 
 import untangle
 import requests
-from tqdm import tqdm
+from rich.progress import Progress
 
 from ._config import DATA_DIR
 from .rev10 import (
@@ -227,22 +227,14 @@ def download_from_CDC(
     
     total_size = int(response.headers.get("content-length", 0))
     block_size = 1024
-    progress_bar = tqdm(
-        total=total_size, 
-        unit="iB", 
-        unit_scale=True,
-        desc="Downloading XML file",
-        disable=not verbose
-    )
     
-    with open(save_path, 'wb') as xml_file:
-        for binary_data in response.iter_content(block_size):
-            xml_file.write(binary_data)
-            progress_bar.update(len(binary_data))
-    
-    progress_bar.close()
-    
-    if verbose and total_size != 0 and total_size != progress_bar.n:
-        raise RuntimeError(
-            f"Downloaded file seems incomplete. Check file at {save_path}"
+    with Progress() as progress:
+        download_task = progress.add_task(
+            "[green]Downloading XML file", 
+            total=total_size,
+            visible=verbose
         )
+        with open(save_path, 'wb') as xml_file:
+            for binary_data in response.iter_content(block_size):
+                xml_file.write(binary_data)
+                progress.update(download_task, advance=len(binary_data))

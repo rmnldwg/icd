@@ -51,7 +51,7 @@ def test_entry(chapter_num, start_code, mid_code, end_code):
     chapter.add_child(block)
     assert block.should_contain(sub_block1), "Block should contain sub block 1"
     block.add_child(sub_block1)
-    assert root.tree() == sub_block1.ancestry(), (
+    assert root.tree(print_out=False) == sub_block1.ancestry(print_out=False), (
         "For linear tree, `tree()` and `ancestry()` must be same"
     )
     assert block.should_contain(sub_block2), "Block should contain sub block 2"
@@ -117,7 +117,7 @@ def test_entries(codex):
                 "If `depth_in_kind` is larger than 1, parent and child must be "
                 "same type."
             )
-        tree_str = entry.tree()
+        tree_str = entry.tree(print_out=False)
         num_lines = tree_str.count("\n")
         assert num_lines == len(list(entry.entries)), (
             "Tree must list all entries under current"
