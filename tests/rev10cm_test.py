@@ -157,9 +157,9 @@ def test_root(codex):
     assert root.is_root, "Root must have `is_root == True`."
     assert not root.is_leaf, "Root cannot be leaf."
     assert root.get_root() == root, "Root of root must be root."
-    assert hasattr(root, "chapter")
-    for code, chapter in root.chapter.items():
-        assert chapter.code == code, "Chapter dict of root incorrect"
+    assert hasattr(root, "chapters")
+    for code, chapter in root.chapters.items():
+        assert chapter.code == code, "Chapters dict of root incorrect"
 
 
 def test_chapter(codex):
@@ -175,9 +175,9 @@ def test_chapter(codex):
         assert isinstance(chapter.parent, ICD10CMRoot), (
             "Parent of chapter must be root"
         )
-        assert hasattr(chapter, "block")
-        for code, block in chapter.block.items():
-            assert block.code == code, "Block dict of chapter incorrect"
+        assert hasattr(chapter, "blocks")
+        for code, block in chapter.blocks.items():
+            assert block.code == code, "Blocks dict of chapter incorrect"
 
 
 def test_codex(codex):
