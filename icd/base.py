@@ -257,6 +257,14 @@ class ICDEntry():
             if child.parent == self:
                 child.parent = None
     
+    def code_matches(self, code: str) -> bool:
+        """
+        Check if a given ICD code (with or without the '.') matches the 
+        entry's code.
+        """
+        self_dotless_code = self.code.replace('.', '')
+        return code in self.code or code in self_dotless_code
+    
     def search(self, code: str, maxdepth: Optional[int] = None) -> List[ICDEntry]:
         """
         Search a given code in the tree.
@@ -270,7 +278,7 @@ class ICDEntry():
         """
         res = []
         
-        if code in self.code:
+        if self.code_matches(code):
             res = [self]
         
         if maxdepth is not None and maxdepth <= self.depth:
@@ -287,7 +295,7 @@ class ICDEntry():
         With `maxdepth` you can choose how deep the method goes down the tree 
         for the search.
         """
-        if self.code == code:
+        if self.code_matches(code):
             return True
         
         if maxdepth is not None and maxdepth <= self.depth:
@@ -308,7 +316,7 @@ class ICDEntry():
         Set `maxdepth` to the maximum depth you want to go down the tree for 
         the search.
         """
-        if self.code == code and self.kind == kind:
+        if self.code_matches(code) and self.kind == kind:
             return self
         
         if maxdepth is not None and maxdepth <= self.depth:
