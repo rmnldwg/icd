@@ -127,6 +127,45 @@ class ICD10Chapter(ICDChapter, ICD10Entry):
     Subclass of the general `ICDChapter` class implementing a specialized 
     XML parsing method for initialization.
     """
+    @staticmethod
+    def romanize(number: int):
+        """Romanize an integer."""
+        units     = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX']
+        tens      = ['', 'X', 'XX', 'XXX', 'XL', 'L', 'LX', 'LXX', 'LXXX', 'XC']
+        hundrets  = ['', 'C', 'CC', 'CCC', 'CD', 'D', 'DC', 'DCC', 'DCCC', 'CM']
+        thousands = ['', 'M', 'MM', 'MMM']
+        
+        roman_num = thousands[number // 1000]
+        number = number % 1000
+        roman_num += hundrets[number // 100]
+        number = number % 100
+        roman_num += tens[number // 10]
+        number = number % 10
+        roman_num += units[number]
+        
+        return roman_num
+        
+        
+    def __post_init__(self):
+        """Romanize chapter number."""
+        tmp = super().__post_init__()
+        
+        if (
+            type(self.code) == str 
+            and 
+            all([c in "IVXLCDM" for c in self.code])
+        ):
+            return tmp
+        
+        try:
+            chapter_num = int(self.code)
+        except ValueError:
+            raise ValueError("Chapter number must be integer")
+        
+        self.code = self.romanize(chapter_num)
+        return tmp
+    
+    
     @classmethod
     def from_xml(
         cls, 

@@ -89,6 +89,32 @@ class ICDEntry():
             return self.parent.get_root()
     
     @property
+    def chapter(self):
+        """
+        If the entry is a chapter or below (block or category), return the 
+        chapter it is in.
+        """
+        if self.kind == "root":
+            raise AttributeError("Root object has no chapter")
+        elif self.kind == "chapter":
+            return self
+        else:
+            return self.parent.chapter
+    
+    @property
+    def block(self):
+        """
+        Return the nearest block the current entry is under. If the entry is of 
+        kind `root` or `chapter`, this raises an error.
+        """
+        if self.kind in ["root", "chapter"]:
+            raise AttributeError("Roots & chapters are not part of blocks")
+        elif self.kind == "block":
+            return self
+        else:
+            return self.parent.block
+    
+    @property
     def depth(self):
         """Return the depth of the entry in the codex tree."""
         if self.is_root:
@@ -231,6 +257,14 @@ class ICDEntry():
             if child.parent == self:
                 child.parent = None
     
+    def code_matches(self, code: str) -> bool:
+        """
+        Check if a given ICD code (with or without the '.') matches the 
+        entry's code.
+        """
+        self_dotless_code = self.code.replace('.', '')
+        return code in self.code or code in self_dotless_code
+    
     def search(self, code: str, maxdepth: Optional[int] = None) -> List[ICDEntry]:
         """
         Search a given code in the tree.
@@ -244,7 +278,7 @@ class ICDEntry():
         """
         res = []
         
-        if code in self.code:
+        if self.code_matches(code):
             res = [self]
         
         if maxdepth is not None and maxdepth <= self.depth:
@@ -261,7 +295,7 @@ class ICDEntry():
         With `maxdepth` you can choose how deep the method goes down the tree 
         for the search.
         """
-        if self.code == code:
+        if self.code_matches(code):
             return True
         
         if maxdepth is not None and maxdepth <= self.depth:
@@ -282,7 +316,7 @@ class ICDEntry():
         Set `maxdepth` to the maximum depth you want to go down the tree for 
         the search.
         """
-        if self.code == code and self.kind == kind:
+        if self.code_matches(code) and self.kind == kind:
             return self
         
         if maxdepth is not None and maxdepth <= self.depth:
@@ -311,7 +345,7 @@ class ICDRoot(ICDEntry):
         return tmp
     
     @property
-    def chapter(self) -> ICDChapter:
+    def chapters(self) -> ICDChapter:
         """Returns a dictionary containing all the ICD chapters loaded under a 
         roman-numeral key. E.g., chapter 2 can be accessed via something like 
         `root.chapter['II']`."""
@@ -329,40 +363,8 @@ class ICDChapter(ICDEntry):
     """
     kind: str = field(repr=False, default="chapter")
     
-    def __post_init__(self):
-        """Romanize chapter number and get release from root."""
-        tmp = super().__post_init__()
-        
-        units     = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX']
-        tens      = ['', 'X', 'XX', 'XXX', 'XL', 'L', 'LX', 'LXX', 'LXXX', 'XC']
-        hundrets  = ['', 'C', 'CC', 'CCC', 'CD', 'D', 'DC', 'DCC', 'DCCC', 'CM']
-        thousands = ['', 'M', 'MM', 'MMM']
-        roman_letters = [*units[1:], *tens[1:], *hundrets[1:], *thousands[1:]]
-        
-        if (
-            type(self.code) == str 
-            and 
-            all([c in roman_letters for c in self.code])
-        ):
-            return tmp
-        
-        try:
-            chapter_num = int(self.code)
-        except ValueError:
-            raise ValueError("Chapter number must be integer")
-        roman_num = thousands[chapter_num // 1000]
-        chapter_num = chapter_num % 1000
-        roman_num += hundrets[chapter_num // 100]
-        chapter_num = chapter_num % 100
-        roman_num += tens[chapter_num // 10]
-        chapter_num = chapter_num % 10
-        roman_num += units[chapter_num]
-        self.code = roman_num
-        
-        return tmp
-    
     @property
-    def block(self) -> Dict[str, ICDBlock]:
+    def blocks(self) -> Dict[str, ICDBlock]:
         """Returns a dictionary containing all blocks loaded for this chapter 
         under a key corresponding to their ICD-range. E.g., block `C00-C96` 
         contains all categories with codes ranging from `C00` to `C96`."""
@@ -380,14 +382,14 @@ class ICDBlock(ICDEntry):
     kind: str = field(repr=False, default="block")
     
     @property
-    def block(self) -> ICDBlock:
+    def blocks(self) -> ICDBlock:
         """Like :class:`ICDChapter`, a block might have blocks as children, 
         which can be accessed in the exact same way as for the chapter."""
         if len(self.children) > 0 and isinstance(self.children[0], ICDBlock):
             return self._child_dict
     
     @property
-    def category(self) -> ICDCategory:
+    def categories(self) -> ICDCategory:
         """In case the block does not have blocks, but categories as children, 
         they can be accessed via the `category` attribute, which also returns a 
         dictionary, just like `block`."""
@@ -417,7 +419,7 @@ class ICDCategory(ICDEntry):
     kind: str = field(repr=False, default="category")
     
     @property
-    def category(self) -> ICDCategory:
+    def categories(self) -> ICDCategory:
         """If there exists a finer classification of the category, this 
         property returns them as a dictionary of respective ICDs as key and the 
         actual entry as value."""
