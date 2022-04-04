@@ -60,22 +60,24 @@ def test_entry(chapter_num, start_code, mid_code, end_code):
     
     assert root.exists(chapter.code), "chapter doesn't seem to exist"
     assert chapter in root.search(chapter.code), "Didn't find chapter"
-    assert chapter.chapter == chapter, "Chapter's `chapter` must be chapter"
+    with pytest.raises(AttributeError):
+        _ = chapter.chapter
     
     assert root.exists(block.code), "block doesn't seem to exist"
     assert block in root.search(block.code), "Didn't find block"
     assert block.chapter == chapter, "Block's chapter wrong"
-    assert block.block == block, "Block's `block` must be block"
+    with pytest.raises(AttributeError):
+        _ = block.block
     
     assert root.exists(sub_block1.code), "sub block 1 doesn't seem to exist"
     assert sub_block1 in root.search(sub_block1.code), "Didn't find sub_block1"
     assert sub_block1.chapter == chapter, "Sub block 1's chapter wrong"
-    assert sub_block1.block == sub_block1, "Sub block 1's block must be sub block 1"
+    assert sub_block1.block == block, "Sub block 1's block must be block"
     
     assert root.exists(sub_block2.code), "sub block 2 doesn't seem to exist"
     assert sub_block2 in root.search(sub_block2.code), "Didn't find sub_block2"
     assert sub_block2.chapter == chapter, "Sub block 2's chapter wrong"
-    assert sub_block2.block == sub_block2, "Sub block 2's block must be sub block 2"
+    assert sub_block2.block == block, "Sub block 2's block must be block"
     
     assert root.exists(category.code), "category doesn't seem to exist"
     assert category in root.search(category.code), "Didn't find category"
@@ -117,7 +119,7 @@ def test_entries(codex):
         assert entry in codex.search(entry.code), "entry not in search results"
         assert entry.revision == revision, "Not all entries have same revision"
         assert entry.release == release, "Not all entries have the same release"
-        assert entry.get_root() == codex, "Root of entries must be codex root"
+        assert entry.root == codex, "Root of entries must be codex root"
         assert all([child.parent == entry for child in entry.children]), (
             "All entrie's children must have entry as parent."
         )
@@ -148,7 +150,7 @@ def test_request(codex):
             assert leaf.code in response[0], (
                 "Responded code not same as leaf code"
             )
-            assert leaf.title in response[1], (
+            assert leaf.title.lower() in response[1].lower(), (
                 "Responded title not same as leaf title"
             )
 
@@ -169,7 +171,7 @@ def test_root(codex):
     assert root.parent is None, "Root cannot have parents."
     assert root.is_root, "Root must have `is_root == True`."
     assert not root.is_leaf, "Root cannot be leaf."
-    assert root.get_root() == root, "Root of root must be root."
+    assert root.root == root, "Root of root must be root."
     assert hasattr(root, "chapters")
     for code, chapter in root.chapters.items():
         assert chapter.code == code, "Chapters dict of root incorrect"

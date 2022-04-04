@@ -62,7 +62,7 @@ class ICDEntry():
         if isinstance(self, ICDRoot):
             return self._release
         else:
-            return self.get_root().release
+            return self.root.release
     
     @release.setter
     def release(self, new_release):
@@ -81,36 +81,33 @@ class ICDEntry():
         """
         return self.parent is None
     
-    def get_root(self) -> ICDRoot:
+    @property
+    def root(self) -> ICDRoot:
         """Recursively find the root of the ICD codex from any entry."""
         if self.is_root:
             return self
         else:
-            return self.parent.get_root()
+            return self.parent.root
     
     @property
     def chapter(self):
-        """
-        If the entry is a chapter or below (block or category), return the 
-        chapter it is in.
-        """
-        if self.kind == "root":
-            raise AttributeError("Root object has no chapter")
-        elif self.kind == "chapter":
-            return self
+        """If the entry is a block or category, return the chapter it is in."""
+        if self.kind in ["root", "chapter"]:
+            raise AttributeError("Root and chapter objects have no chapter")
+        elif self.parent.kind == "chapter":
+            return self.parent
         else:
             return self.parent.chapter
     
     @property
     def block(self):
-        """
-        Return the nearest block the current entry is under. If the entry is of 
-        kind `root` or `chapter`, this raises an error.
-        """
+        """Return the closest ancestor that is a block."""
         if self.kind in ["root", "chapter"]:
             raise AttributeError("Roots & chapters are not part of blocks")
-        elif self.kind == "block":
-            return self
+        elif self.parent.kind in ["root", "chapter"]:
+            raise AttributeError("This block is not part of any other block")
+        elif self.parent.kind == "block":
+            return self.parent
         else:
             return self.parent.block
     
@@ -272,7 +269,7 @@ class ICDEntry():
         The argument `code` can be a chapter number, block range or actual ICD 
         code of a disease. It may even only be a part of an ICD code. 
         `maxdepth` is the maximum recusion depth the method will go into for 
-        the search.
+        the search. The `code` can be provided with or without the dot.
         
         It returns the a list of entries that match the given code.
         """
@@ -293,7 +290,7 @@ class ICDEntry():
         Check if a given `code` exists in the codex tree.
         
         With `maxdepth` you can choose how deep the method goes down the tree 
-        for the search.
+        for the search. The `code` can be provided with or without the dot.
         """
         if self.code_matches(code):
             return True
@@ -311,7 +308,7 @@ class ICDEntry():
     ) -> ICDEntry:
         """
         Return the ICD category with the given `code` that is of the specified 
-        `kind` if it exists.
+        `kind` if it exists. Will work with or without the dot in the `code`.
         
         Set `maxdepth` to the maximum depth you want to go down the tree for 
         the search.
