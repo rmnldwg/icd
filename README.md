@@ -1,5 +1,17 @@
 # Python Interface to the International Statistical Classification of Diseases and Related Health Problems
 
+[![license badge](https://img.shields.io/badge/license-MIT-blue.svg?style=flat)][license file]
+[![ICD-10 badge](https://img.shields.io/badge/ICD--10-%F0%9F%97%B8%20done-green.svg?style=flat)][ICD-10]
+[![ICD-10-CM badge](https://img.shields.io/badge/ICD--10--CM-%F0%9F%97%B8%20done-green.svg?style=flat)][ICD-10-CM]
+[![ICD-11 badge](https://img.shields.io/badge/ICD--11-%E2%9C%97%20not%20yet-red.svg?style=flat)][ICD-11]
+![tests badge](https://github.com/rmnldwg/icd/actions/workflows/tests.yml/badge.svg?style=flat)
+![codecov badge](https://codecov.io/gh/rmnldwg/icd/branch/main/graph/badge.svg?token=LPXQPK5K78)
+
+[license file]: https://github.com/rmnldwg/icd/blob/main/LICENSE
+[ICD-10]: https://icd.who.int/browse10
+[ICD-10-CM]: https://www.cdc.gov/nchs/icd/icd10cm.htm
+[ICD-11]: https://icd.who.int/browse11
+
 ***
 
 ## Installation
@@ -17,6 +29,10 @@ pip install .
 
 ## Usage
 
+📖 **DOCS:** The full documentation can is hosted on [here][docs] using GitHub pages.
+
+[docs]: https://rmnldwg.github.io/icd
+
 To get started, import the package and load a codex. The ICD-10 codex can be loaded from the submodule `rev10`, while the clinical modification of the CDC, ICD-10-CM, is available in `rev10cm`:
 
 ```python
@@ -26,14 +42,12 @@ icd10_codex = icd.rev10.get_codex(release="2019")
 icd10cm_codex = icd.rev10cm.get_codex(release="2022")
 ```
 
-### Chapters
+### Chapters 
 
-The created objects are both root nodes of the respective ICD tree. Directy 
-under that, it contains the main chapters of the classification, which are 
-accessible via a dictionary aptly named `chapter`
+The created objects are both root nodes of the respective ICD tree. Directy under that, it contains the main chapters of the classification, which are accessible via a dictionary aptly named `chapters`
 
 ```python
-icd10_codex.chapter["IX"]
+icd10_codex.chapters["IX"]
 ```
 
 returns
@@ -42,12 +56,14 @@ returns
 ICD10Chapter(code='IX', title='Diseases of the circulatory system', revision='10')
 ```
 
-### Blocks
+⚠️ **NOTE:** There is also an attribute called `chapter`. But that attribute returns the parent chapter - if it has one - of the entry. This is a general pattern: The singular form (`root`, `chapter`, `block`) returns a parent entry (if available) while the plural form (`chapters`, `blocks`, `categories`) return dictionaries with keys of ICD codes and values of children elements.
 
-Next in the ICD hierarchy are blocks, for which the `code` attribute is a range of ICD codes, like `"C00-C96"`. The blocks of a chapter are accessible from a chapter via `block` in the same manner as chapters are accessed from the root.
+### Blocks 
+
+Next in the ICD hierarchy are blocks, for which the `code` attribute is a range of ICD codes, like `C00-C96`. The blocks of a chapter are accessible from a chapter via `blocks` in the same manner as chapters are accessed from the root.
 
 ```python
-icd10_codex.chapter["II"].block["C00-C97"]
+icd10_codex.chapters["II"].blocks["C00-C97"]
 ```
 
 returns
@@ -56,12 +72,20 @@ returns
 ICD10Block(code='C00-C97', title='Malignant neoplasms', revision='10')
 ```
 
-### Category
-
-Blocks themselves can have either yet more, but finer, blocks as children (reach them via the `block` attribute again) or categories containing actual diagnoses. In the latter case - you might have guessed it - they are returned in a dictionary with codes as keys called `category`.
+Blocks may contain other blocks. So it is possible for a block element to have both the attributes `block` and `blocks` available. E.g. the block with the code `C00-C75` is such a case:
 
 ```python
-icd10_codex.chapter["XVI"].block["P05-P08"].category["P07"]
+middle_block = codex.get("C00-C75")
+parent_block = middle_block.block    # this will have the code `C00-C97`
+child_blocks = moddle_block.blocks   # dictionary containing more blocks below
+```
+
+### Category
+
+Blocks themselves can have either yet more, but finer, blocks as children (reach them via the `blocks` attribute again) or categories containing actual diagnoses. In the latter case - you might have guessed it - they are returned in a dictionary with codes as keys called `categories`.
+
+```python
+icd10_codex.chapter["XVI"].block["P05-P08"].categories["P07"]
 ```
 
 returns
@@ -70,12 +94,12 @@ returns
 ICD10Category(code='P07', title='Disorders related to short gestation and low birth weight, not elsewhere classified', revision='10')
 ```
 
-### Exploration
+### Exploration 🧭
 
 Of course, one doesn't know the chapters, blocks and codes by heart. Which is why there are a growing number of utilities to explore and visualize the tree of codes. Frist, the entire subtree of an entry can be plotted up to a specified depth using the `tree(maxdepth=<N>)` method:
 
 ```python
-print(icd10_codex.chapter["XII"].tree(maxdepth=2))
+icd10_codex.chapters["XII"].tree(maxdepth=2)
 ```
 
 returns
@@ -124,8 +148,8 @@ It is also possible to search for codes or even just parts of codes using the `s
 # get category by ICD code
 cat = icd10_codex.search("C32.1")[0]
 
-# print acnestry of category
-print(cat.ancestry())
+# print ancestry of category
+cat.ancestry()
 ```
 
 The `ancestry()` function prints out the ancestors of a given entry, in contrast to the `tree()`, which prints the descendants. The above code will output this:
@@ -140,7 +164,12 @@ root ICD-10: International Statistical Classification of Diseases and Related He
                     └───category C32.1: Supraglottis
 ```
 
-Finally, it's possible to check if a specific code exists using the `exists()` method.
+Finally, it's possible to check if a specific code exists using the `exists(code)` method and return it using `get(code)`:
+
+```python
+codex.exists("H26.2")  # will return `True`
+codex.get("H26.2")     # will return the respective category
+```
 
 ***
 
