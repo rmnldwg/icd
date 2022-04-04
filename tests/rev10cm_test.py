@@ -21,7 +21,7 @@ from icd.rev10cm import (
 
 @pytest.fixture(params=["2019", "2020", "2021", "2022"], scope="session")
 def codex(request):
-    return icd.rev10cm.get_codex(release=request.param)
+    return get_codex(release=request.param)
 
 
 @given(
@@ -60,14 +60,27 @@ def test_entry(chapter_num, start_code, mid_code, end_code):
     
     assert root.exists(chapter.code), "chapter doesn't seem to exist"
     assert chapter in root.search(chapter.code), "Didn't find chapter"
+    assert chapter.chapter == chapter, "Chapter's `chapter` must be chapter"
+    
     assert root.exists(block.code), "block doesn't seem to exist"
     assert block in root.search(block.code), "Didn't find block"
+    assert block.chapter == chapter, "Block's chapter wrong"
+    assert block.block == block, "Block's `block` must be block"
+    
     assert root.exists(sub_block1.code), "sub block 1 doesn't seem to exist"
     assert sub_block1 in root.search(sub_block1.code), "Didn't find sub_block1"
+    assert sub_block1.chapter == chapter, "Sub block 1's chapter wrong"
+    assert sub_block1.block == sub_block1, "Sub block 1's block must be sub block 1"
+    
     assert root.exists(sub_block2.code), "sub block 2 doesn't seem to exist"
     assert sub_block2 in root.search(sub_block2.code), "Didn't find sub_block2"
+    assert sub_block2.chapter == chapter, "Sub block 2's chapter wrong"
+    assert sub_block2.block == sub_block2, "Sub block 2's block must be sub block 2"
+    
     assert root.exists(category.code), "category doesn't seem to exist"
     assert category in root.search(category.code), "Didn't find category"
+    assert category.chapter == chapter, "Category's chapter wrong"
+    assert category.block == sub_block1, "Category's block wrong"
     
     assert chapter in root.children, "Chapter isn't child of root"
     assert block in chapter.children, "Block isn't child of chapter"
