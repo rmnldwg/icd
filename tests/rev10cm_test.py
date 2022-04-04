@@ -1,5 +1,6 @@
 import os
 import random
+from difflib import SequenceMatcher
 import pytest
 import hypothesis
 from hypothesis import given, assume, settings
@@ -150,8 +151,11 @@ def test_request(codex):
             assert leaf.code in response[0], (
                 "Responded code not same as leaf code"
             )
-            assert leaf.title.lower() in response[1].lower(), (
-                "Responded title not same as leaf title"
+            leaf_title = leaf.title.lower()
+            resonse_title = response[1].lower()
+            seqmatch = SequenceMatcher(None, leaf_title, resonse_title)
+            assert seqmatch.ratio() >= 0.5, (
+                "Responded title not similar to leaf title"
             )
 
 

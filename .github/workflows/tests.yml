@@ -21,7 +21,7 @@ jobs:
           pip install .[test]
       - name: Run tests
         run: |
-          coverage run --omit=tests/*,*/_*.py -m pytest ./tests
+          coverage run --omit=tests/*,*/_*.py -m pytest ./tests -vv
           coverage xml
       - name: Upload to codecov
         uses: codecov/codecov-action@v2
