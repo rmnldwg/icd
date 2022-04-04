@@ -141,22 +141,29 @@ def test_entries(codex):
 
 
 def test_request(codex):
-    """Test whether the ICD API request works."""
-    leaves = list(codex.leaves)
-    leaf_subset = random.sample(leaves, k=10)
-    
-    for leaf in leaf_subset:
-        response_list = leaf.request()
-        for response in response_list:
-            assert leaf.code in response[0], (
-                "Responded code not same as leaf code"
-            )
-            leaf_title = leaf.title.lower()
-            resonse_title = response[1].lower()
-            seqmatch = SequenceMatcher(None, leaf_title, resonse_title)
-            assert seqmatch.ratio() >= 0.5, (
-                "Responded title not similar to leaf title"
-            )
+    """
+    Test whether the ICD API request works. Run this test only for the 
+    latest ICD-10-CM release. Apparently, some entries are stored differently 
+    on the CDC API than in the data they release, which is why some 'fuzzy' 
+    testing is required.
+    """
+    if codex.release == "2022":
+        leaves = list(codex.leaves)
+        leaf_subset = random.sample(leaves, k=10)
+        
+        for leaf in leaf_subset:
+            response_list = leaf.request()
+            for response in response_list:
+                assert leaf.code in response[0], (
+                    "Responded code not same as leaf code"
+                )
+                leaf_title = leaf.title.lower()
+                response_title = response[1].lower()
+                seqmatch = SequenceMatcher(None, leaf_title, response_title)
+                assert leaf_title in response_title or seqmatch.ratio() >= 0.8, (
+                    f"Responded title: {response_title}, "
+                    f"Stored title: {leaf_title}"
+                )
 
 
 def test_root(codex):
