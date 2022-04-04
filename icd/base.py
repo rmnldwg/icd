@@ -101,10 +101,7 @@ class ICDEntry():
     
     @property
     def block(self):
-        """
-        Return the nearest block the current entry is under. If the entry is of 
-        kind `root` or `chapter`, this raises an error.
-        """
+        """Return the closest ancestor that is a block."""
         if self.kind in ["root", "chapter"]:
             raise AttributeError("Roots & chapters are not part of blocks")
         elif self.parent.kind in ["root", "chapter"]:
@@ -272,7 +269,7 @@ class ICDEntry():
         The argument `code` can be a chapter number, block range or actual ICD 
         code of a disease. It may even only be a part of an ICD code. 
         `maxdepth` is the maximum recusion depth the method will go into for 
-        the search.
+        the search. The `code` can be provided with or without the dot.
         
         It returns the a list of entries that match the given code.
         """
@@ -293,7 +290,7 @@ class ICDEntry():
         Check if a given `code` exists in the codex tree.
         
         With `maxdepth` you can choose how deep the method goes down the tree 
-        for the search.
+        for the search. The `code` can be provided with or without the dot.
         """
         if self.code_matches(code):
             return True
@@ -311,7 +308,7 @@ class ICDEntry():
     ) -> ICDEntry:
         """
         Return the ICD category with the given `code` that is of the specified 
-        `kind` if it exists.
+        `kind` if it exists. Will work with or without the dot in the `code`.
         
         Set `maxdepth` to the maximum depth you want to go down the tree for 
         the search.
