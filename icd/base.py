@@ -363,38 +363,6 @@ class ICDChapter(ICDEntry):
     """
     kind: str = field(repr=False, default="chapter")
     
-    def __post_init__(self):
-        """Romanize chapter number and get release from root."""
-        tmp = super().__post_init__()
-        
-        units     = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX']
-        tens      = ['', 'X', 'XX', 'XXX', 'XL', 'L', 'LX', 'LXX', 'LXXX', 'XC']
-        hundrets  = ['', 'C', 'CC', 'CCC', 'CD', 'D', 'DC', 'DCC', 'DCCC', 'CM']
-        thousands = ['', 'M', 'MM', 'MMM']
-        roman_letters = [*units[1:], *tens[1:], *hundrets[1:], *thousands[1:]]
-        
-        if (
-            type(self.code) == str 
-            and 
-            all([c in roman_letters for c in self.code])
-        ):
-            return tmp
-        
-        try:
-            chapter_num = int(self.code)
-        except ValueError:
-            raise ValueError("Chapter number must be integer")
-        roman_num = thousands[chapter_num // 1000]
-        chapter_num = chapter_num % 1000
-        roman_num += hundrets[chapter_num // 100]
-        chapter_num = chapter_num % 100
-        roman_num += tens[chapter_num // 10]
-        chapter_num = chapter_num % 10
-        roman_num += units[chapter_num]
-        self.code = roman_num
-        
-        return tmp
-    
     @property
     def blocks(self) -> Dict[str, ICDBlock]:
         """Returns a dictionary containing all blocks loaded for this chapter 
