@@ -5,7 +5,8 @@
 [![ICD-10-CM badge](https://img.shields.io/badge/ICD--10--CM-%F0%9F%97%B8%20done-green.svg?style=flat)][ICD-10-CM]
 [![ICD-11 badge](https://img.shields.io/badge/ICD--11-%E2%9C%97%20not%20yet-red.svg?style=flat)][ICD-11]
 ![tests badge](https://github.com/rmnldwg/icd/actions/workflows/tests.yml/badge.svg?style=flat)
-![codecov badge](https://codecov.io/gh/rmnldwg/icd/branch/main/graph/badge.svg?token=LPXQPK5K78)
+[![codecov](https://codecov.io/gh/rmnldwg/icd/branch/main/graph/badge.svg?token=53LOK18GLT)](https://codecov.io/gh/rmnldwg/icd)
+
 
 [license file]: https://github.com/rmnldwg/icd/blob/main/LICENSE
 [ICD-10]: https://icd.who.int/browse10
