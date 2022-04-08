@@ -1,11 +1,11 @@
 """
 ## Python module for use with the base ICD-10
 
-This is an independent python implementation of the **International Statistical 
-Classification of Diseases and Related Health Problems, 10th Revision** 
+This is an independent python implementation of the **International Statistical
+Classification of Diseases and Related Health Problems, 10th Revision**
 (ICD-10) as defined by the **World Health Organization** (WHO).
 
-The data files are obtained from the WHO's [download area][WHO download], 
+The data files are obtained from the WHO's [download area][WHO download],
 which requires one to be logged in to access the underlying files.
 
 [WHO download]: https://apps.who.int/classifications/apps/icd/ClassificationDownload/DLArea/Download.aspx
@@ -30,29 +30,29 @@ class ICD10Entry(ICDEntry):
     """
     revision: str = "10"
     """Major revision of the ICD standard."""
-    
+
     def request(
-        self, 
-        auth_method: str = "args", 
-        icd_api_id: Optional[str] = None, 
+        self,
+        auth_method: str = "args",
+        icd_api_id: Optional[str] = None,
         icd_api_secret: Optional[str] = None,
         api_ver: int = 2,
         lang: str = "en",
     ) -> str:
         """
         Return information on an entry from WHO's ICD API.
-        
-        This function provides two ways for authenticating to the API: One can 
-        simply provide the `ClientId` as `icd_api_id` and the `ClientSecret` as 
-        `icd_api_secret`, in which case `auth_method` must be set to `"args"`. 
-        Or the two strings can be set as environment variables aptly named 
-        `ICD_API_ID` and `ICD_API_SECRET`. In that case, set `auth_method` to 
+
+        This function provides two ways for authenticating to the API: One can
+        simply provide the `ClientId` as `icd_api_id` and the `ClientSecret` as
+        `icd_api_secret`, in which case `auth_method` must be set to `"args"`.
+        Or the two strings can be set as environment variables aptly named
+        `ICD_API_ID` and `ICD_API_SECRET`. In that case, set `auth_method` to
         `"env"`.
-        
-        There are two major versions of the ICD API that can be chosen by 
+
+        There are two major versions of the ICD API that can be chosen by
         setting `api_ver` to either `1` ot `2`.
-        
-        The API provides its response in different languages, which can be 
+
+        The API provides its response in different languages, which can be
         selected by setting `lang`, e.g. to `"en"`.
         """
         if auth_method == "env":
@@ -60,10 +60,10 @@ class ICD10Entry(ICDEntry):
             icd_api_secret = os.getenv("ICD_API_SECRET")
         elif auth_method != "args":
             raise ValueError("`auth_method` must be either 'args' or 'env'.")
-        
+
         if icd_api_id is None or icd_api_secret is None:
             raise ValueError("Both ICD_API_ID and ICD_API_SECRET must be set.")
-        
+
         # Authenticate
         token_endpoint = "https://icdaccessmanagement.who.int/connect/token"
         payload = {
@@ -74,7 +74,7 @@ class ICD10Entry(ICDEntry):
         }
         response = requests.post(token_endpoint, data=payload).json()
         access_token = response["access_token"]
-        
+
         # Make request
         year = self.get_root().year
         uri = f"https://id.who.int/icd/release/10/{year}/{self.code}"
@@ -85,33 +85,33 @@ class ICD10Entry(ICDEntry):
             "API-Version": f"v{api_ver}",
         }
         response = requests.get(uri, headers=headers)
-        
+
         # check if request was successful, if not, try to get another release
         if response.status_code != requests.codes.ok:
             fallback_uri = f"https://id.who.int/icd/release/10/{self.code}"
             response = requests.get(fallback_uri, headers=headers)
-            
+
             if response.status_code == requests.codes.ok:
                 latest_uri = response.json()["latestRelease"]
                 response = requests.get(latest_uri, headers=headers)
             else:
                 raise requests.HTTPError(
-                    f"Could not resolve code {self.code}", 
+                    f"Could not resolve code {self.code}",
                     response=response
                 )
-        
+
         return response
 
 
 @dataclass
 class ICD10Root(ICDRoot, ICD10Entry):
     """
-    Subclass of the base `ICDRoot` that implements a method `from_xml` to load 
+    Subclass of the base `ICDRoot` that implements a method `from_xml` to load
     the ICD-10 codex from an XML file as provided by the WHO.
     """
     title: str = field(init=True)
     """Title describing the codex stored under this root."""
-    
+
     @classmethod
     def from_xml(cls, xml_title: untangle.Element) -> ICD10Root:
         """Create root from XML Title element."""
@@ -124,7 +124,7 @@ class ICD10Root(ICDRoot, ICD10Entry):
 
 class ICD10Chapter(ICDChapter, ICD10Entry):
     """
-    Subclass of the general `ICDChapter` class implementing a specialized 
+    Subclass of the general `ICDChapter` class implementing a specialized
     XML parsing method for initialization.
     """
     @staticmethod
@@ -134,7 +134,7 @@ class ICD10Chapter(ICDChapter, ICD10Entry):
         tens      = ['', 'X', 'XX', 'XXX', 'XL', 'L', 'LX', 'LXX', 'LXXX', 'XC']
         hundrets  = ['', 'C', 'CC', 'CCC', 'CD', 'D', 'DC', 'DCC', 'DCCC', 'CM']
         thousands = ['', 'M', 'MM', 'MMM']
-        
+
         roman_num = thousands[number // 1000]
         number = number % 1000
         roman_num += hundrets[number // 100]
@@ -142,34 +142,33 @@ class ICD10Chapter(ICDChapter, ICD10Entry):
         roman_num += tens[number // 10]
         number = number % 10
         roman_num += units[number]
-        
+
         return roman_num
-        
-        
+
+
     def __post_init__(self):
         """Romanize chapter number."""
-        tmp = super().__post_init__()
-        
+        super().__post_init__()
+
         if (
-            type(self.code) == str 
-            and 
+            isinstance(self.code, str)
+            and
             all([c in "IVXLCDM" for c in self.code])
         ):
-            return tmp
-        
+            return
+
         try:
             chapter_num = int(self.code)
-        except ValueError:
-            raise ValueError("Chapter number must be integer")
-        
+        except ValueError as val_err:
+            raise ValueError("Chapter number must be integer") from val_err
+
         self.code = self.romanize(chapter_num)
-        return tmp
-    
-    
+
+
     @classmethod
     def from_xml(
-        cls, 
-        xml_class: untangle.Element, 
+        cls,
+        xml_class: untangle.Element,
         root: ICD10Root
     ) -> ICD10Chapter:
         """Create a chapter from an XML Class element."""
@@ -186,27 +185,27 @@ class ICD10Chapter(ICDChapter, ICD10Entry):
 
 class ICD10Block(ICDBlock, ICD10Entry):
     """
-    Class inheriting from `ICDBlock` that implements a XML parsing method 
-    as well as functionality to infer whether another block should be be a 
+    Class inheriting from `ICDBlock` that implements a XML parsing method
+    as well as functionality to infer whether another block should be be a
     descendant of the current one.
     """
     @classmethod
-    def from_xml(cls, xml_class: untangle.Element, *args) -> ICD10Block:
+    def from_xml(cls, xml_class: untangle.Element, *_) -> ICD10Block:
         """Create a block from an XML Class element."""
-        for r in xml_class.Rubric:
-            if r["kind"] == "preferred":
-                preferred_title = r.Label.cdata
+        for rubric in xml_class.Rubric:
+            if rubric["kind"] == "preferred":
+                preferred_title = rubric.Label.cdata
         block = cls(
             code=xml_class["code"],
             title=preferred_title
         )
         return block
-    
+
     @property
     def start_code(self) -> str:
         """Returns the first ICD code included in this block."""
-        return self.code.split("-")[0]
-    
+        return self.code.split("-", maxsplit=1)[0]
+
     @property
     def end_code(self) -> str:
         """Respectively returns the last ICD code of the block."""
@@ -225,26 +224,26 @@ class ICD10Block(ICDBlock, ICD10Entry):
         """Check whether this block should contain the given block"""
         if not isinstance(block, ICD10Block):
             return False
-        
+
         if self == block:
             return False
-        
+
         has_start_ge = block.start_code >= self.start_code
         has_end_le = block.end_code <= self.end_code
         if has_start_ge and has_end_le:
             return True
-        
+
         return False
-    
+
 
 
 class ICD10Category(ICDCategory, ICD10Entry):
     """
-    Subclass of `ICDCategory` implementing an XML parsing classmethod for 
+    Subclass of `ICDCategory` implementing an XML parsing classmethod for
     initialization from WHO's data.
     """
     @classmethod
-    def from_xml(cls, xml_class: untangle.Element, *args) -> ICD10Category:
+    def from_xml(cls, xml_class: untangle.Element, *_) -> ICD10Category:
         """Create a category from an XML Class element."""
         for r in xml_class.Rubric:
             if r["kind"] == "preferred":
@@ -258,53 +257,53 @@ class ICD10Category(ICDCategory, ICD10Entry):
 
 def get_codex(release: str = "2019", verbose: bool = False) -> ICD10Root:
     """
-    Parse ICD-10 XML codex given a release year and create an explorable tree 
+    Parse ICD-10 XML codex given a release year and create an explorable tree
     of ICD-10 entries from it.
-    
+
     Set `verbose` to `True` for progress update of data loading and parsing.
     """
     verboseprint = print if verbose else lambda *a, **k: None
-    
+
     xml_path = os.path.join(
         DATA_DIR, "icd-10/", f"icd10{release}en.xml"
     )
-    
+
     verboseprint(f"Looking for XML file at {xml_path}...", end="")
     if not os.path.exists(xml_path):
         verboseprint("FAILED")
         raise IOError(f"File {xml_path} does not exist")
     verboseprint("FOUND")
-    
+
     verboseprint("Parsing XML...", end="")
     xml_root = untangle.parse(xml_path).ClaML
     verboseprint("SUCCESS")
-    
+
     root = ICD10Root.from_xml(xml_title=xml_root.Title)
     xml_entry_dict = {}
     cls = {
-        "chapter": ICD10Chapter, 
-        "block": ICD10Block, 
+        "chapter": ICD10Chapter,
+        "block": ICD10Block,
         "category": ICD10Category
     }
-    # put all xml entries and ICD objects (created from that entry) into one 
+    # put all xml entries and ICD objects (created from that entry) into one
     # large dictionary for easier connecting
     iterator = track(
-        xml_root.Class, 
-        description="Create entries and sort by code", 
+        xml_root.Class,
+        description="Create entries and sort by code",
         disable=not verbose
     )
     for xml_class in iterator:
         xml_entry_dict[xml_class["code"]] = (
-            xml_class, 
+            xml_class,
             cls[xml_class["kind"]].from_xml(xml_class, root)
         )
-    
+
     iterator = track(
         xml_entry_dict.items(),
         description="Append entries to tree",
-        disable=not verbose, 
+        disable=not verbose,
     )
-    for code, xml_entry_tuple in iterator:
+    for _, xml_entry_tuple in iterator:
         xml_class, entry = xml_entry_tuple
         if hasattr(xml_class, "SubClass"):
             for subcls in xml_class.SubClass:
@@ -317,6 +316,5 @@ def get_codex(release: str = "2019", verbose: bool = False) -> ICD10Root:
                     )
                 entry.add_child(sub_entry)
     verboseprint("DONE")
-    
+
     return root
-    
