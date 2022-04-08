@@ -11,16 +11,17 @@ which requires one to be logged in to access the underlying files.
 [WHO download]: https://apps.who.int/classifications/apps/icd/ClassificationDownload/DLArea/Download.aspx
 """
 from __future__ import annotations
-import os
-from typing import Optional
-from dataclasses import dataclass, field
 
-import untangle
+import os
+from dataclasses import dataclass, field
+from typing import Optional
+
 import requests
+import untangle
 from rich.progress import track
 
 from ._config import DATA_DIR
-from .base import ICDEntry, ICDRoot, ICDChapter, ICDBlock, ICDCategory
+from .base import ICDBlock, ICDCategory, ICDChapter, ICDEntry, ICDRoot
 
 
 @dataclass

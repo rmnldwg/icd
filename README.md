@@ -4,8 +4,8 @@
 [![ICD-10 badge](https://img.shields.io/badge/ICD--10-%F0%9F%97%B8%20done-green.svg?style=flat)][ICD-10]
 [![ICD-10-CM badge](https://img.shields.io/badge/ICD--10--CM-%F0%9F%97%B8%20done-green.svg?style=flat)][ICD-10-CM]
 [![ICD-11 badge](https://img.shields.io/badge/ICD--11-%E2%9C%97%20not%20yet-red.svg?style=flat)][ICD-11]
-![tests badge](https://github.com/rmnldwg/icd/actions/workflows/tests.yml/badge.svg?style=flat) 
-[![docs badge](https://github.com/rmnldwg/icd/actions/workflows/docs.yml/badge.svg?style=flat)](https://rmnldwg.github.io/icd) 
+![tests badge](https://github.com/rmnldwg/icd/actions/workflows/tests.yml/badge.svg?style=flat)
+[![docs badge](https://github.com/rmnldwg/icd/actions/workflows/docs.yml/badge.svg?style=flat)](https://rmnldwg.github.io/icd)
 [![codecov](https://codecov.io/gh/rmnldwg/icd/branch/main/graph/badge.svg?token=53LOK18GLT)](https://codecov.io/gh/rmnldwg/icd)
 
 
@@ -31,13 +31,13 @@
 
 ## Disclaimer
 
-⚠️ This is not an official tool from the WHO, the CDC or any other authority with respect to clinical classifications. This Python package is independently developed and maintainaned. It should therefore probably not be used in critical clinical applications as it wasn't approved or cross-checked by the issuers of the classifications. 
+⚠️ This is not an official tool from the WHO, the CDC or any other authority with respect to clinical classifications. This Python package is independently developed and maintainaned. It should therefore probably not be used in critical clinical applications as it wasn't approved or cross-checked by the issuers of the classifications.
 
 ***
 
 ## Installation
 
-This package has not yet been pushed to PyPI, so it can't just be installed via pip. Instead, clone the repository, `cd` into the directory and install it 
+This package has not yet been pushed to PyPI, so it can't just be installed via pip. Instead, clone the repository, `cd` into the directory and install it
 locally.
 
 ```bash
@@ -63,7 +63,7 @@ icd10_codex = icd.rev10.get_codex(release="2019")
 icd10cm_codex = icd.rev10cm.get_codex(release="2022")
 ```
 
-### Chapters 
+### Chapters
 
 The created objects are both root nodes of the respective ICD tree. Directy under that, it contains the main chapters of the classification, which are accessible via a dictionary aptly named `chapters`
 
@@ -79,7 +79,7 @@ ICD10Chapter(code='IX', title='Diseases of the circulatory system', revision='10
 
 ⚠️ **NOTE:** There is also an attribute called `chapter`. But that attribute returns the parent chapter - if it has one - of the entry. This is a general pattern: The singular form (`root`, `chapter`, `block`) returns a parent entry (if available) while the plural form (`chapters`, `blocks`, `categories`) return dictionaries with keys of ICD codes and values of children elements.
 
-### Blocks 
+### Blocks
 
 Next in the ICD hierarchy are blocks, for which the `code` attribute is a range of ICD codes, like `C00-C96`. The blocks of a chapter are accessible from a chapter via `blocks` in the same manner as chapters are accessed from the root.
 

@@ -15,18 +15,18 @@ following ways:
 [CDC API]:      https://clinicaltables.nlm.nih.gov/apidoc/icd10cm/v3/doc.html
 """
 from __future__ import annotations
+
 import os
 from dataclasses import dataclass, field
 from typing import Optional
 
-import untangle
 import requests
+import untangle
 from rich.progress import Progress
 
 from ._config import DATA_DIR
-from .rev10 import (
-    ICD10Entry, ICD10Root, ICD10Chapter, ICD10Block, ICD10Category
-)
+from .rev10 import (ICD10Block, ICD10Category, ICD10Chapter, ICD10Entry,
+                    ICD10Root)
 
 
 @dataclass

@@ -4,8 +4,9 @@ for the International statistical classification of diseases and related health
 problems (10th revision).
 """
 from __future__ import annotations
+
 from dataclasses import dataclass, field
-from typing import List, Optional, Dict
+from typing import Dict, List, Optional
 
 
 @dataclass
