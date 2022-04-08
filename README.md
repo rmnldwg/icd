@@ -4,7 +4,8 @@
 [![ICD-10 badge](https://img.shields.io/badge/ICD--10-%F0%9F%97%B8%20done-green.svg?style=flat)][ICD-10]
 [![ICD-10-CM badge](https://img.shields.io/badge/ICD--10--CM-%F0%9F%97%B8%20done-green.svg?style=flat)][ICD-10-CM]
 [![ICD-11 badge](https://img.shields.io/badge/ICD--11-%E2%9C%97%20not%20yet-red.svg?style=flat)][ICD-11]
-![tests badge](https://github.com/rmnldwg/icd/actions/workflows/tests.yml/badge.svg?style=flat)
+![tests badge](https://github.com/rmnldwg/icd/actions/workflows/tests.yml/badge.svg?style=flat) 
+[![docs badge](https://github.com/rmnldwg/icd/actions/workflows/docs.yml/badge.svg?style=flat)](https://rmnldwg.github.io/icd) 
 [![codecov](https://codecov.io/gh/rmnldwg/icd/branch/main/graph/badge.svg?token=53LOK18GLT)](https://codecov.io/gh/rmnldwg/icd)
 
 
@@ -12,6 +13,25 @@
 [ICD-10]: https://icd.who.int/browse10
 [ICD-10-CM]: https://www.cdc.gov/nchs/icd/icd10cm.htm
 [ICD-11]: https://icd.who.int/browse11
+
+***
+
+## Content
+
+1. [Disclaimer](#disclaimer)
+2. [Installation](#installation)
+3. [Usage](#usage)
+   1. [Chapters](#chapters)
+   2. [Blocks](#blocks)
+   3. [Category](#category)
+   4. [Exploration](#exploration)
+4. [Motivation](#motivation)
+
+***
+
+## Disclaimer
+
+⚠️ This is not an official tool from the WHO, the CDC or any other authority with respect to clinical classifications. This Python package is independently developed and maintainaned. It should therefore probably not be used in critical clinical applications as it wasn't approved or cross-checked by the issuers of the classifications. 
 
 ***
 
@@ -95,7 +115,7 @@ returns
 ICD10Category(code='P07', title='Disorders related to short gestation and low birth weight, not elsewhere classified', revision='10')
 ```
 
-### Exploration 🧭
+### Exploration
 
 Of course, one doesn't know the chapters, blocks and codes by heart. Which is why there are a growing number of utilities to explore and visualize the tree of codes. Frist, the entire subtree of an entry can be plotted up to a specified depth using the `tree(maxdepth=<N>)` method:
 
