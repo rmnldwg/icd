@@ -77,7 +77,7 @@ class ICD10Entry(ICDEntry):
         access_token = response["access_token"]
 
         # Make request
-        year = self.get_root().year
+        year = self.root.year
         uri = f"https://id.who.int/icd/release/10/{year}/{self.code}"
         headers = {
             "Authorization": "Bearer " + access_token,

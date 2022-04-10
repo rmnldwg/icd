@@ -73,7 +73,6 @@ class ICD10CMRoot(ICD10Root, ICD10CMEntry):
             "International Classification of Diseases, Tenth Revision, "
             f"Clinical Modification, {self.release} release"
         )
-        return
 
     @classmethod
     def from_xml(cls, xml_root: untangle.Element) -> ICD10CMRoot:
