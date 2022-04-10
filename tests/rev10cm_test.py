@@ -1,23 +1,18 @@
 import os
 import random
 from difflib import SequenceMatcher
-import pytest
+
 import hypothesis
-from hypothesis import given, assume, settings
 import hypothesis.strategies as st
-import untangle
+import pytest
 import requests
+import untangle
+from hypothesis import assume, given, settings
 
 import icd
 from icd.base import ICDChapter, ICDEntry
-from icd.rev10cm import (
-    ICD10CMRoot, 
-    ICD10CMChapter, 
-    ICD10CMBlock, 
-    ICD10CMCategory,
-    download_from_CDC,
-    get_codex
-)
+from icd.rev10cm import (ICD10CMBlock, ICD10CMCategory, ICD10CMChapter,
+                         ICD10CMRoot, download_from_CDC, get_codex)
 
 
 @pytest.fixture(params=["2019", "2020", "2021", "2022"], scope="session")
@@ -43,11 +38,11 @@ def test_entry(chapter_num, start_code, mid_code, end_code):
     block = ICD10CMBlock(code=f"{start_code}-{end_code}", title="Test Block")
     sub_block1 = ICD10CMBlock(code=mid_code, title="Test Subblock 1")
     sub_block2 = ICD10CMBlock(
-        code=chr(ord(mid_code) + 1), 
+        code=chr(ord(mid_code) + 1),
         title="Test Subblock 2"
     )
     category = ICD10CMCategory(f"{mid_code}.1", "Test category")
-    
+
     root.add_child(chapter)
     chapter.add_child(block)
     assert block.should_contain(sub_block1), "Block should contain sub block 1"
@@ -58,63 +53,63 @@ def test_entry(chapter_num, start_code, mid_code, end_code):
     assert block.should_contain(sub_block2), "Block should contain sub block 2"
     block.add_child(sub_block2)
     sub_block1.add_child(category)
-    
+
     assert root.exists(chapter.code), "chapter doesn't seem to exist"
     assert chapter in root.search(chapter.code), "Didn't find chapter"
     with pytest.raises(AttributeError):
         _ = chapter.chapter
-    
+
     assert root.exists(block.code), "block doesn't seem to exist"
     assert block in root.search(block.code), "Didn't find block"
     assert block.chapter == chapter, "Block's chapter wrong"
     with pytest.raises(AttributeError):
         _ = block.block
-    
+
     assert root.exists(sub_block1.code), "sub block 1 doesn't seem to exist"
     assert sub_block1 in root.search(sub_block1.code), "Didn't find sub_block1"
     assert sub_block1.chapter == chapter, "Sub block 1's chapter wrong"
     assert sub_block1.block == block, "Sub block 1's block must be block"
-    
+
     assert root.exists(sub_block2.code), "sub block 2 doesn't seem to exist"
     assert sub_block2 in root.search(sub_block2.code), "Didn't find sub_block2"
     assert sub_block2.chapter == chapter, "Sub block 2's chapter wrong"
     assert sub_block2.block == block, "Sub block 2's block must be block"
-    
+
     assert root.exists(category.code), "category doesn't seem to exist"
     assert category in root.search(category.code), "Didn't find category"
     assert category.chapter == chapter, "Category's chapter wrong"
     assert category.block == sub_block1, "Category's block wrong"
-    
+
     assert chapter in root.children, "Chapter isn't child of root"
     assert block in chapter.children, "Block isn't child of chapter"
     assert sub_block1 in block.children, "Sub block 1 isn't child of block"
     assert sub_block2 in block.children, "Sub block 2 isn't child of block"
-    
+
     assert chapter.parent == root, "Root isn't parent of chapter"
     assert block.parent == chapter, "Chapter isn't parent of block"
     assert sub_block1.parent == block, "Block isn't parent of sub block 1"
     assert sub_block2.parent == block, "Block isn't parent of sub block 2"
-    
+
     block.remove_child(sub_block2)
-    
+
     assert sub_block2.parent is None, "Removed child still has parent"
     assert sub_block2 not in block.children, "Removed child is still child"
-    
+
     chapter.add_child(sub_block2)
-    
+
     assert sub_block2 not in chapter.children, (
         "sub block 2 should have been added to the block, not the chapter"
     )
     assert sub_block2 in block.children, "sub block 2 schould be block's child"
     assert sub_block2.parent == block, "Sub block 2 parent is not block"
-    
-    
+
+
 def test_entries(codex):
     entries = list(codex.entries)
     entry_subset = random.sample(entries, k=100)
     revision = "10-CM"
     release = codex.release
-    
+
     for entry in entry_subset:
         assert codex.exists(entry.code), "entry does not seem to exist"
         assert entry in codex.search(entry.code), "entry not in search results"
@@ -141,22 +136,29 @@ def test_entries(codex):
 
 
 def test_request(codex):
-    """Test whether the ICD API request works."""
-    leaves = list(codex.leaves)
-    leaf_subset = random.sample(leaves, k=10)
-    
-    for leaf in leaf_subset:
-        response_list = leaf.request()
-        for response in response_list:
-            assert leaf.code in response[0], (
-                "Responded code not same as leaf code"
-            )
-            leaf_title = leaf.title.lower()
-            resonse_title = response[1].lower()
-            seqmatch = SequenceMatcher(None, leaf_title, resonse_title)
-            assert seqmatch.ratio() >= 0.5, (
-                "Responded title not similar to leaf title"
-            )
+    """
+    Test whether the ICD API request works. Run this test only for the
+    latest ICD-10-CM release. Apparently, some entries are stored differently
+    on the CDC API than in the data they release, which is why some 'fuzzy'
+    testing is required.
+    """
+    if codex.release == "2022":
+        leaves = list(codex.leaves)
+        leaf_subset = random.sample(leaves, k=10)
+
+        for leaf in leaf_subset:
+            response_list = leaf.request()
+            for response in response_list:
+                assert leaf.code in response[0], (
+                    "Responded code not same as leaf code"
+                )
+                leaf_title = leaf.title.lower()
+                response_title = response[1].lower()
+                seqmatch = SequenceMatcher(None, leaf_title, response_title)
+                assert leaf_title in response_title or seqmatch.ratio() >= 0.8, (
+                    f"Responded title: {response_title}, "
+                    f"Stored title: {leaf_title}"
+                )
 
 
 def test_root(codex):
@@ -232,10 +234,10 @@ def test_download_from_CDC(tmpdir, release):
     """
     with pytest.raises(requests.RequestException):
         download_from_CDC(custom_url="https://made.up/file.xml")
-    
+
     with pytest.raises(IOError):
         download_from_CDC(save_path="/made/up/path")
-    
+
     download_from_CDC(release=release, save_path=tmpdir)
     tmp_file_path = tmpdir / f"icd10cm_tabular_{release}.xml"
     assert os.path.exists(str(tmp_file_path)), (

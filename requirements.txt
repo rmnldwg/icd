@@ -1,3 +1,4 @@
 -e .[docs,test]
 ipython
 pdoc
+pre-commit

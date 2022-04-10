@@ -1,14 +1,8 @@
 import pytest
 
-
 from icd.base import ICDChapter, ICDEntry
-from icd.rev10 import (
-    ICD10Root, 
-    ICD10Chapter, 
-    ICD10Block, 
-    ICD10Category,
-    get_codex
-)
+from icd.rev10 import (ICD10Block, ICD10Category, ICD10Chapter, ICD10Root,
+                       get_codex)
 
 
 @pytest.mark.parametrize(
