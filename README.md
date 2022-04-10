@@ -26,6 +26,7 @@
    3. [Category](#category)
    4. [Exploration](#exploration)
 4. [Motivation](#motivation)
+5. [Roadmap](#roadmap)
 
 ***
 
@@ -50,7 +51,7 @@ pip install .
 
 ## Usage
 
-📖 **DOCS:** The full documentation can is hosted on [here][docs] using GitHub pages.
+📖 **DOCS:** The full documentation is hosted [here][docs] using GitHub pages.
 
 [docs]: https://rmnldwg.github.io/icd
 
@@ -201,3 +202,21 @@ I recently noticed that there have been some attempts to write a Python package 
 Despite those attempts however, there is no package out there that would serve all needs or even just simply deal with the latest 11th revision of ICD. On one hand this might be because the WHO is actually quite stingy with the raw data. If it publishes any data openly at all it is usually some reduced table in a somewhat unconventional format (for programmers and data scientists).
 
 This package attempts to combine the great ideas of the previously mentioned packages but provide a more complete interface to the ICD system.
+
+***
+
+## Roadmap
+
+As one might have noticed, this package isn't the complete interface to the ICD system it strives to be. So, here's an outlook of what features are planned to be added soon:
+
+- [ ] Implementation of the latest revision ICD-11 ([issue #7])
+- [ ] A translation from ICD-10 to ICD-11 and back ([issue #8])
+- [ ] Adding modifiers to ICD-10 ([issue #3])
+- [ ] Enable exporting the codex in different formats ([issue #6])
+
+[issue #3]: https://github.com/rmnldwg/icd/issues/3
+[issue #6]: https://github.com/rmnldwg/icd/issues/6
+[issue #7]: https://github.com/rmnldwg/icd/issues/7
+[issue #8]: https://github.com/rmnldwg/icd/issues/8
+
+Stay tuned for updates!
