@@ -4,49 +4,50 @@ for the International statistical classification of diseases and related health
 problems (10th revision).
 """
 from __future__ import annotations
-
-from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
 
-@dataclass
 class ICDEntry():
     """
-    Base dataclass representing an ICD chapter, block or category of ICD 10,
-    ICD 10-CM or ICD 11.
+    Base class representing an abstract ICD chapter, block or category of ICD 
+    10, ICD 10-CM or ICD 11.
     """
-    code: str
-    """The chapter number, block range or ICD code of the entry."""
-    title: str
-    """Description of the chapter, block or category."""
-    revision: str = field(init=False)
-    kind: str = field(repr=False, default="entry")
-    """Can be `entry`, `root`, `chapter`, `block` or `category`."""
-    parent: Optional[ICDEntry] = field(
-        default=None, repr=False, compare=False
-    )
-    """Direct ancestor of the entry."""
-    children: List[ICDEntry] = field(
-        default_factory=lambda: [], repr=False, compare=False
-    )
-    """List of direct descendants of the entry."""
-
-    def __post_init__(self):
+    def __init__(
+        self,
+        code: str,
+        title: str,
+        kind: str,
+        parent: ICDEntry = None,
+        children: Optional[List[ICDEntry]] = None
+    ):
         """
-        Make sure `kind` & `revision` take on allowed values and get the
-        release & revision from the root of the codex.
+        Initialize base ICD entry and make sure `kind` & `revision` 
+        attributes take on allowed values. The attribute `kind` can only be one 
+        of 'root', 'chapter', 'block' or 'category', While currently this 
+        package only supports the 10th and 11th revision along with the CDC's 
+        clinical modification 10-CM as `revision` attribute.
         """
-        if self.kind not in ["entry", "root", "chapter", "block", "category"]:
+        if kind not in ["root", "chapter", "block", "category"]:
             raise ValueError(
                 "Attribute kind must be one of 'root', 'chapter', 'block' or "
                 "'category'"
             )
-        if self.revision not in ["10", "10-CM", "11"]:
-            raise ValueError(
-                "This package only supports ICD '10', '10-CM' or '11', not "
-                f"{self.revision}"
+        if not isinstance(parent, ICDEntry):
+            raise TypeError(
+                "Parent entry of an ICD entry must inherit from `ICDEntry`"
             )
-        return
+        self.code = code
+        self.title = title
+        self.kind = kind
+        
+        self.parent = None
+        parent.add_child(self)
+        
+        self.children = []
+        if children is not None:
+            for child in children:
+                self.add_child(child)
+
 
     def __str__(self):
         return f"{self.kind} {self.code}: {self.title}"
@@ -325,21 +326,14 @@ class ICDEntry():
                 return category
 
 
-
-@dataclass
 class ICDRoot(ICDEntry):
     """
     Root of the ICD 10 tree. It serves as an entry point for the recursive
     parsing of the XML data file and also stores the version of the data.
     """
-    code: str = field(init=False)
-    title: str = field(init=False)
-    _release: str = ""
-    kind: str = field(repr=False, default="root")
-
-    def __post_init__(self):
-        super().__post_init__()
-        self.code = f"ICD-{self.revision}"
+    def __init__(self, code: str, title: str, release: str, *args, **kwargs):
+        super().__init__(code, title, *args, kind="root", **kwargs)
+        self._release = release
 
     @property
     def chapters(self) -> Dict[str, ICDChapter]:
@@ -349,7 +343,6 @@ class ICDRoot(ICDEntry):
         return self._child_dict
 
 
-@dataclass
 class ICDChapter(ICDEntry):
     """
     One of the 22 chapters in the ICD codex. In the XML data obtained from the
@@ -358,7 +351,8 @@ class ICDChapter(ICDEntry):
     roman numerals to identify chapters, so the `code` attribute is converted.
     E.g., chapter `2` will be accessible from the root via `root.chapter['II']`.
     """
-    kind: str = field(repr=False, default="chapter")
+    def __init__(self, code: str, title: str, *args, **kwargs):
+        super().__init__(code, title, *args, kind="chapter", **kwargs)
 
     @property
     def blocks(self) -> Dict[str, ICDBlock]:
@@ -368,7 +362,6 @@ class ICDChapter(ICDEntry):
         return self._child_dict
 
 
-@dataclass
 class ICDBlock(ICDEntry):
     """
     A block of ICD codes within a chapter. A block specifies a range of ICD
@@ -376,7 +369,8 @@ class ICDBlock(ICDEntry):
     not necessarily categories as direct children. The `code` attribute of a
     block might be something like `C00-C96`.
     """
-    kind: str = field(repr=False, default="block")
+    def __init__(self, code: str, title: str, *args, **kwargs):
+        super().__init__(code, title, *args, kind="block", **kwargs)
 
     @property
     def blocks(self) -> Optional[ICDBlock]:
@@ -407,14 +401,14 @@ class ICDBlock(ICDEntry):
         return super().get(code, maxdepth)
 
 
-@dataclass
 class ICDCategory(ICDEntry):
     """
     A category of the ICD system. These are the only entries in the ICD codex
     for which the `code` attribute actually holds a valid ICD code in the regex
     form `[A-Z][0-9]{2}(.[0-9]{1,3})?`.
     """
-    kind: str = field(repr=False, default="category")
+    def __init__(self, code: str, title: str, *args, **kwargs):
+        super().__init__(code, title, *args, kind="entry", **kwargs)
 
     @property
     def categories(self) -> ICDCategory:

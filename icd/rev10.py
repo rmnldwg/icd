@@ -13,7 +13,6 @@ which requires one to be logged in to access the underlying files.
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass, field
 from typing import Optional
 
 import requests
@@ -24,13 +23,11 @@ from ._config import DATA_DIR
 from .base import ICDBlock, ICDCategory, ICDChapter, ICDEntry, ICDRoot
 
 
-@dataclass
 class ICD10Entry(ICDEntry):
     """
     Class representing an entry in the 10th ICD revision.
     """
     revision: str = "10"
-    """Major revision of the ICD standard."""
 
     def request(
         self,
@@ -104,21 +101,26 @@ class ICD10Entry(ICDEntry):
         return response
 
 
-@dataclass
 class ICD10Root(ICDRoot, ICD10Entry):
     """
     Subclass of the base `ICDRoot` that implements a method `from_xml` to load
     the ICD-10 codex from an XML file as provided by the WHO.
     """
-    title: str = field(init=True)
-    """Title describing the codex stored under this root."""
+    def __init__(self, title: str, release: str, *args, **kwargs):
+        super().__init__(
+            "ICD-10 root",
+            title,
+            release,
+            *args,
+            **kwargs,
+        )
 
     @classmethod
     def from_xml(cls, xml_title: untangle.Element) -> ICD10Root:
         """Create root from XML Title element."""
         root = cls(
             title=xml_title.cdata,
-            _release=xml_title["version"]
+            release=xml_title["version"]
         )
         return root
 
@@ -146,25 +148,22 @@ class ICD10Chapter(ICDChapter, ICD10Entry):
 
         return roman_num
 
-
-    def __post_init__(self):
-        """Romanize chapter number."""
-        super().__post_init__()
-
+    def __init__(self, code: str, title: str, *args, **kwargs):
+        """Romanize the chapter number if necessary."""
         if (
-            isinstance(self.code, str)
+            isinstance(code, str)
             and
-            all([c in "IVXLCDM" for c in self.code])
+            all([c in "IVXLCDM" for c in code])
         ):
             return
 
         try:
-            chapter_num = int(self.code)
+            chapter_num = int(code)
         except ValueError as val_err:
             raise ValueError("Chapter number must be integer") from val_err
 
-        self.code = self.romanize(chapter_num)
-
+        code = self.romanize(chapter_num)
+        super().__init__(code, title, *args, kind="chapter", **kwargs)
 
     @classmethod
     def from_xml(
@@ -237,18 +236,20 @@ class ICD10Block(ICDBlock, ICD10Entry):
         return False
 
 
-
 class ICD10Category(ICDCategory, ICD10Entry):
     """
     Subclass of `ICDCategory` implementing an XML parsing classmethod for
     initialization from WHO's data.
     """
+    def __init__(self, code: str, title: str, *args, **kwargs):
+        super().__init__(code, title, *args, kind="category", **kwargs)
+
     @classmethod
     def from_xml(cls, xml_class: untangle.Element, *_) -> ICD10Category:
         """Create a category from an XML Class element."""
-        for r in xml_class.Rubric:
-            if r["kind"] == "preferred":
-                preferred_title = r.Label.cdata
+        for rubric in xml_class.Rubric:
+            if rubric["kind"] == "preferred":
+                preferred_title = rubric.Label.cdata
         category = cls(
             code=xml_class["code"],
             title=preferred_title
