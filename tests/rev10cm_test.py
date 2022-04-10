@@ -33,7 +33,7 @@ def test_entry(chapter_num, start_code, mid_code, end_code):
     """
     assume(start_code <= mid_code < end_code)
     release = "testrelease"
-    root = ICD10CMRoot(_release=release)
+    root = ICD10CMRoot(release=release)
     chapter = ICD10CMChapter(chapter_num, "Test Chapter")
     block = ICD10CMBlock(code=f"{start_code}-{end_code}", title="Test Block")
     sub_block1 = ICD10CMBlock(code=mid_code, title="Test Subblock 1")

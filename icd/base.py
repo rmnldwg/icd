@@ -32,7 +32,7 @@ class ICDEntry():
                 "Attribute kind must be one of 'root', 'chapter', 'block' or "
                 "'category'"
             )
-        if not isinstance(parent, ICDEntry):
+        if not issubclass(parent.__class__, ICDEntry):
             raise TypeError(
                 "Parent entry of an ICD entry must inherit from `ICDEntry`"
             )
@@ -153,10 +153,9 @@ class ICDEntry():
         a different kind, while a value of 2 means that the parent is still of
         the same kind, but the grantparent is different.
         """
-        if type(self.parent) != type(self):
+        if not isinstance(self.parent, self.__class__):
             return 1
-        else:
-            return self.parent.depth_in_kind + 1
+        return self.parent.depth_in_kind + 1
 
     @property
     def _child_dict(self) -> Dict[str, ICDEntry]:
