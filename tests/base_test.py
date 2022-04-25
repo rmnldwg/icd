@@ -6,7 +6,7 @@ import pytest
 
 import hypothesis
 import hypothesis.strategies as st
-from hypothesis import given
+from hypothesis import given, assume
 
 import icd
 from icd.base import ICDEntry, ICDRoot, ICDChapter, ICDBlock, ICDCategory
@@ -251,3 +251,28 @@ class TestICDEntry:
         kind_seq_count = count_identical_seq(kind_list)
 
         assert kind_seq_count == depth_in_kind_list
+
+
+    @given(
+        entry=entry(),
+        children=st.lists(entry(), min_size=1)
+    )
+    def test__child_dict(self, entry, children):
+        """Check the dictionary of children."""
+        child_codes = [child.code for child in children]
+        assume(len(set(child_codes)) == len(child_codes))
+        for child in children:
+            entry.add_child(child)
+        child_dict = entry._child_dict  # pylint: disable=protected-access
+        assert all([child_dict[child.code] == child for child in children])
+
+
+    @given(linear_codex=linear_codex())
+    def test_tree_and_ancestry(self, linear_codex):
+        """
+        Make sure that for a linear codex the `ancestry` and `tree`
+        functions return the same string.
+        """
+        root = linear_codex
+        leaf = next(root.leaves)
+        assert root.tree() == leaf.ancestry()
