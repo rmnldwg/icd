@@ -9,7 +9,7 @@ from typing import Dict, List, Optional
 
 class ICDEntry():
     """
-    Base class representing an abstract ICD chapter, block or category of ICD 
+    Base class representing an abstract ICD chapter, block or category of ICD
     10, ICD 10-CM or ICD 11.
     """
     def __init__(
@@ -21,28 +21,30 @@ class ICDEntry():
         children: Optional[List[ICDEntry]] = None
     ):
         """
-        Initialize base ICD entry and make sure `kind` & `revision` 
-        attributes take on allowed values. The attribute `kind` can only be one 
-        of 'root', 'chapter', 'block' or 'category', While currently this 
-        package only supports the 10th and 11th revision along with the CDC's 
+        Initialize base ICD entry and make sure `kind` & `revision`
+        attributes take on allowed values. The attribute `kind` can only be one
+        of 'root', 'chapter', 'block' or 'category', While currently this
+        package only supports the 10th and 11th revision along with the CDC's
         clinical modification 10-CM as `revision` attribute.
         """
         if kind not in ["root", "chapter", "block", "category"]:
             raise ValueError(
                 "Attribute kind must be one of 'root', 'chapter', 'block' or "
-                "'category'"
+                f"'category', not {kind}"
             )
-        if not issubclass(parent.__class__, ICDEntry):
-            raise TypeError(
-                "Parent entry of an ICD entry must inherit from `ICDEntry`"
-            )
+
+        self.parent = None
+        if parent is not None:
+            if not issubclass(type(parent), ICDEntry):
+                raise TypeError(
+                    "Parent entry of an ICD entry must inherit from `ICDEntry`"
+                )
+            parent.add_child(self)
+
         self.code = code
         self.title = title
         self.kind = kind
-        
-        self.parent = None
-        parent.add_child(self)
-        
+
         self.children = []
         if children is not None:
             for child in children:
@@ -63,8 +65,8 @@ class ICDEntry():
         """
         if isinstance(self, ICDRoot):
             return self._release
-        else:
-            return self.root.release
+
+        return self.root.release
 
     @release.setter
     def release(self, new_release):
@@ -72,8 +74,8 @@ class ICDEntry():
             raise AttributeError(
                 "Can only set attribute `release` on `ICDRoot` objects."
             )
-        else:
-            self._release = new_release
+
+        self._release = new_release
 
     @property
     def is_root(self) -> bool:
@@ -88,38 +90,38 @@ class ICDEntry():
         """Recursively find the root of the ICD codex from any entry."""
         if self.is_root:
             return self
-        else:
-            return self.parent.root
+
+        return self.parent.root
 
     @property
     def chapter(self):
         """If the entry is a block or category, return the chapter it is in."""
-        if self.kind in ["root", "chapter"]:
-            raise AttributeError("Root and chapter objects have no chapter")
-        elif self.parent.kind == "chapter":
-            return self.parent
-        else:
-            return self.parent.chapter
+        if self.kind == "root":
+            raise AttributeError("Not part of any chapter")
+
+        if self.kind == "chapter":
+            return self
+
+        return self.parent.chapter
 
     @property
     def block(self):
         """Return the closest ancestor that is a block."""
         if self.kind in ["root", "chapter"]:
-            raise AttributeError("Roots & chapters are not part of blocks")
-        elif self.parent.kind in ["root", "chapter"]:
-            raise AttributeError("This block is not part of any other block")
-        elif self.parent.kind == "block":
-            return self.parent
-        else:
-            return self.parent.block
+            raise AttributeError("Not part of any block")
+
+        if self.kind == "block":
+            return self
+
+        return self.parent.block
 
     @property
     def depth(self):
         """Return the depth of the entry in the codex tree."""
         if self.is_root:
             return 1
-        else:
-            return 1 + self.parent.depth
+
+        return 1 + self.parent.depth
 
     @property
     def is_leaf(self) -> bool:
@@ -153,7 +155,9 @@ class ICDEntry():
         a different kind, while a value of 2 means that the parent is still of
         the same kind, but the grantparent is different.
         """
-        if not isinstance(self.parent, self.__class__):
+        if self.parent is None:
+            return 1
+        if self.kind != self.parent.kind:
             return 1
         return self.parent.depth_in_kind + 1
 
@@ -209,15 +213,15 @@ class ICDEntry():
 
         if self.is_root:
             return ancestryprint(str(self) + "\n")
-        else:
-            n = self.depth - 2
-            return ancestryprint(
-                self.parent.ancestry(print_out=False)
-                + n * "    "
-                + "└───"
-                + str(self)
-                + "\n"
-            )
+
+        num = self.depth - 2
+        return ancestryprint(
+            self.parent.ancestry(print_out=False)
+            + num * "    "
+            + "└───"
+            + str(self)
+            + "\n"
+        )
 
     def add_child(self, new_child: ICDEntry):
         """
@@ -236,7 +240,8 @@ class ICDEntry():
                 if block.should_contain(new_child):
                     block.add_child(new_child)
                     return
-                elif new_child.should_contain(block):
+                
+                if new_child.should_contain(block):
                     self.remove_child(block)
                     new_child.add_child(block)
 
@@ -284,6 +289,7 @@ class ICDEntry():
 
         for child in self.children:
             res = [*res, *child.search(code, maxdepth=maxdepth)]
+
         return res
 
     def exists(self, code: str, maxdepth: Optional[int] = None) -> bool:
@@ -299,7 +305,7 @@ class ICDEntry():
         if maxdepth is not None and maxdepth <= self.depth:
             return False
 
-        return any([child.exists(code, maxdepth) for child in self.children])
+        return any(child.exists(code, maxdepth) for child in self.children)
 
     def get(
         self,
