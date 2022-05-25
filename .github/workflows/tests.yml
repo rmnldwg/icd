@@ -17,8 +17,12 @@ jobs:
           python-version: 3.8
       - name: Install deps & package
         run: |
-          python -m pip install --upgrade pip
+          python -m pip install --upgrade pip setuptools wheel
           pip install .[test]
+      - name: Export ICD API authentication variables
+        run: |
+          export ICD_API_ID="${{ secrets.ICD_API_ID }}"
+          export ICD_API_SECRET="${{ secrets.ICD_API_SECRET }}"
       - name: Run tests
         run: |
           coverage run --omit=tests/*,*/_*.py -m pytest ./tests -vv

@@ -2,12 +2,10 @@
 Test the base classes from which the different revisions inherit the core
 functionality.
 """
-import hypothesis
 import hypothesis.strategies as st
 import pytest
-from hypothesis import assume, given
+from hypothesis import assume, given, settings
 
-import icd
 from icd.base import ICDBlock, ICDCategory, ICDChapter, ICDEntry, ICDRoot
 
 
@@ -331,6 +329,7 @@ class TestICDEntry:
         tree_codex=st_tree_codex(),
         maxdepth=st.integers(min_value=0, max_value=100)
     )
+    @settings(max_examples=10, deadline=10000)
     def test_search_exists_and_get(self, tree_codex, maxdepth):
         """Make sure the `search` method finds existing codes in a tree."""
         for entry in tree_codex.entries:
