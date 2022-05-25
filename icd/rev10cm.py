@@ -52,7 +52,7 @@ class ICD10CMEntry(ICDEntry):
 
         # a bit hacky (and potentially dangerous) way to get the array from
         # the returned string...
-        code_list = eval(response.content.decode())[3]
+        code_list = eval(response.content.decode().replace('null,', ''))[-1]
         return code_list
 
 
@@ -90,6 +90,24 @@ class ICD10CMChapter(ICDChapter, ICD10CMEntry):
     Subclassing `ICDChapter` to implement the appropriate `from_xml`
     parsing method.
     """
+    def __init__(self, code: str, title: str, *args, **kwargs):
+        """Romanize the chapter number if necessary."""
+        if (
+            isinstance(code, str)
+            and
+            all([c in "IVXLCDM" for c in code])
+        ):
+            super().__init__(code, title, *args, **kwargs)
+            return
+
+        try:
+            chapter_num = int(code)
+        except ValueError as val_err:
+            raise ValueError("Chapter number must be integer") from val_err
+
+        code = self.romanize(chapter_num)
+        super().__init__(code, title, *args, **kwargs)
+
     @classmethod
     def from_xml(cls, xml_chapter: untangle.Element) -> ICD10CMChapter:
         """Create chapter from respective XML chapter entry."""

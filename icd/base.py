@@ -370,6 +370,24 @@ class ICDChapter(ICDEntry):
         contains all categories with codes ranging from `C00` to `C96`."""
         return self._child_dict
 
+    @staticmethod
+    def romanize(number: int):
+        """Romanize an integer."""
+        units     = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX']
+        tens      = ['', 'X', 'XX', 'XXX', 'XL', 'L', 'LX', 'LXX', 'LXXX', 'XC']
+        hundrets  = ['', 'C', 'CC', 'CCC', 'CD', 'D', 'DC', 'DCC', 'DCCC', 'CM']
+        thousands = ['', 'M', 'MM', 'MMM']
+
+        roman_num = thousands[number // 1000]
+        number = number % 1000
+        roman_num += hundrets[number // 100]
+        number = number % 100
+        roman_num += tens[number // 10]
+        number = number % 10
+        roman_num += units[number]
+
+        return roman_num
+
 
 class ICDBlock(ICDEntry):
     """
@@ -417,7 +435,7 @@ class ICDCategory(ICDEntry):
     form `[A-Z][0-9]{2}(.[0-9]{1,3})?`.
     """
     def __init__(self, code: str, title: str, *args, **kwargs):
-        super().__init__(code, title, *args, kind="entry", **kwargs)
+        super().__init__(code, title, *args, kind="category", **kwargs)
 
     @property
     def categories(self) -> ICDCategory:

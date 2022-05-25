@@ -130,24 +130,6 @@ class ICD10Chapter(ICDChapter, ICD10Entry):
     Subclass of the general `ICDChapter` class implementing a specialized
     XML parsing method for initialization.
     """
-    @staticmethod
-    def romanize(number: int):
-        """Romanize an integer."""
-        units     = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX']
-        tens      = ['', 'X', 'XX', 'XXX', 'XL', 'L', 'LX', 'LXX', 'LXXX', 'XC']
-        hundrets  = ['', 'C', 'CC', 'CCC', 'CD', 'D', 'DC', 'DCC', 'DCCC', 'CM']
-        thousands = ['', 'M', 'MM', 'MMM']
-
-        roman_num = thousands[number // 1000]
-        number = number % 1000
-        roman_num += hundrets[number // 100]
-        number = number % 100
-        roman_num += tens[number // 10]
-        number = number % 10
-        roman_num += units[number]
-
-        return roman_num
-
     def __init__(self, code: str, title: str, *args, **kwargs):
         """Romanize the chapter number if necessary."""
         if (
@@ -155,6 +137,7 @@ class ICD10Chapter(ICDChapter, ICD10Entry):
             and
             all([c in "IVXLCDM" for c in code])
         ):
+            super().__init__(code, title, *args, **kwargs)
             return
 
         try:
@@ -163,7 +146,7 @@ class ICD10Chapter(ICDChapter, ICD10Entry):
             raise ValueError("Chapter number must be integer") from val_err
 
         code = self.romanize(chapter_num)
-        super().__init__(code, title, *args, kind="chapter", **kwargs)
+        super().__init__(code, title, *args, **kwargs)
 
     @classmethod
     def from_xml(
@@ -242,7 +225,7 @@ class ICD10Category(ICDCategory, ICD10Entry):
     initialization from WHO's data.
     """
     def __init__(self, code: str, title: str, *args, **kwargs):
-        super().__init__(code, title, *args, kind="category", **kwargs)
+        super().__init__(code, title, *args, **kwargs)
 
     @classmethod
     def from_xml(cls, xml_class: untangle.Element, *_) -> ICD10Category:
