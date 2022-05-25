@@ -332,13 +332,14 @@ class TestICDEntry:
         tree_codex=tree_codex(),
         maxdepth=st.integers(min_value=0, max_value=100)
     )
-    def test_search_and_exists(self, tree_codex, maxdepth):
+    def test_search_exists_and_get(self, tree_codex, maxdepth):
         """Make sure the `search` method finds existing codes in a tree."""
         for entry in tree_codex.entries:
             code = entry.code
             dotless_code = code.replace('.', '')
             if maxdepth <= entry.depth:
                 assert entry not in tree_codex.search(code, maxdepth=maxdepth)
+                assert tree_codex.get(code, maxdepth, entry.kind) is not entry
             else:
                 assert (
                     tree_codex.exists(code, maxdepth=maxdepth) and

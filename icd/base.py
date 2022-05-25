@@ -324,11 +324,11 @@ class ICDEntry():
         Set `maxdepth` to the maximum depth you want to go down the tree for
         the search.
         """
-        if self.code_matches(code) and self.kind == kind:
-            return self
-
         if maxdepth is not None and maxdepth <= self.depth:
             return None
+
+        if self.code_matches(code) and self.kind == kind:
+            return self
 
         for child in self.children:
             if (category := child.get(code, maxdepth)) is not None:
