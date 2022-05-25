@@ -5,6 +5,7 @@
 [![ICD-10-CM badge](https://img.shields.io/badge/ICD--10--CM-%F0%9F%97%B8%20done-green.svg?style=flat)][ICD-10-CM]
 [![ICD-11 badge](https://img.shields.io/badge/ICD--11-%E2%9C%97%20not%20yet-red.svg?style=flat)][ICD-11]
 ![tests badge](https://github.com/rmnldwg/icd/actions/workflows/tests.yml/badge.svg?style=flat)
+[![docs badge](https://github.com/rmnldwg/icd/actions/workflows/docs.yml/badge.svg?style=flat)](https://rmnldwg.github.io/icd)
 [![codecov](https://codecov.io/gh/rmnldwg/icd/branch/main/graph/badge.svg?token=53LOK18GLT)](https://codecov.io/gh/rmnldwg/icd)
 
 
@@ -15,9 +16,29 @@
 
 ***
 
+## Content
+
+1. [Disclaimer](#disclaimer)
+2. [Installation](#installation)
+3. [Usage](#usage)
+   1. [Chapters](#chapters)
+   2. [Blocks](#blocks)
+   3. [Category](#category)
+   4. [Exploration](#exploration)
+4. [Motivation](#motivation)
+5. [Roadmap](#roadmap)
+
+***
+
+## Disclaimer
+
+⚠️ This is not an official tool from the WHO, the CDC or any other authority with respect to clinical classifications. This Python package is independently developed and maintainaned. It should therefore probably not be used in critical clinical applications as it wasn't approved or cross-checked by the issuers of the classifications.
+
+***
+
 ## Installation
 
-This package has not yet been pushed to PyPI, so it can't just be installed via pip. Instead, clone the repository, `cd` into the directory and install it 
+This package has not yet been pushed to PyPI, so it can't just be installed via pip. Instead, clone the repository, `cd` into the directory and install it
 locally.
 
 ```bash
@@ -30,7 +51,7 @@ pip install .
 
 ## Usage
 
-📖 **DOCS:** The full documentation can is hosted on [here][docs] using GitHub pages.
+📖 **DOCS:** The full documentation is hosted [here][docs] using GitHub pages.
 
 [docs]: https://rmnldwg.github.io/icd
 
@@ -43,9 +64,9 @@ icd10_codex = icd.rev10.get_codex(release="2019")
 icd10cm_codex = icd.rev10cm.get_codex(release="2022")
 ```
 
-### Chapters 
+### Chapters
 
-The created objects are both root nodes of the respective ICD tree. Directy under that, it contains the main chapters of the classification, which are accessible via a dictionary aptly named `chapters`
+The created objects are both root nodes of the respective ICD tree. Directy under that, it contains the main chapters of the classification, which are accessible via a dictionary aptly named `chapters`. The dictionary's keys are the codes of the chapters and the values the respective entry instance. For example
 
 ```python
 icd10_codex.chapters["IX"]
@@ -57,9 +78,9 @@ returns
 ICD10Chapter(code='IX', title='Diseases of the circulatory system', revision='10')
 ```
 
-⚠️ **NOTE:** There is also an attribute called `chapter`. But that attribute returns the parent chapter - if it has one - of the entry. This is a general pattern: The singular form (`root`, `chapter`, `block`) returns a parent entry (if available) while the plural form (`chapters`, `blocks`, `categories`) return dictionaries with keys of ICD codes and values of children elements.
+⚠️ **NOTE:** There is also an attribute called `chapter`. But that attribute returns the current entry's chapter, which is either the entry itself, if it *is* a chapter, or the chapter under which the entry is grouped. This is a general pattern: The singular form (`root`, `chapter`, `block`) returns the grouping *above* the current entry, while the plural form (`chapters`, `blocks`, `categories`) return dictionaries with keys of ICD codes and values of children elements *below*.
 
-### Blocks 
+### Blocks
 
 Next in the ICD hierarchy are blocks, for which the `code` attribute is a range of ICD codes, like `C00-C96`. The blocks of a chapter are accessible from a chapter via `blocks` in the same manner as chapters are accessed from the root.
 
@@ -95,7 +116,7 @@ returns
 ICD10Category(code='P07', title='Disorders related to short gestation and low birth weight, not elsewhere classified', revision='10')
 ```
 
-### Exploration 🧭
+### Exploration
 
 Of course, one doesn't know the chapters, blocks and codes by heart. Which is why there are a growing number of utilities to explore and visualize the tree of codes. Frist, the entire subtree of an entry can be plotted up to a specified depth using the `tree(maxdepth=<N>)` method:
 
@@ -181,3 +202,21 @@ I recently noticed that there have been some attempts to write a Python package 
 Despite those attempts however, there is no package out there that would serve all needs or even just simply deal with the latest 11th revision of ICD. On one hand this might be because the WHO is actually quite stingy with the raw data. If it publishes any data openly at all it is usually some reduced table in a somewhat unconventional format (for programmers and data scientists).
 
 This package attempts to combine the great ideas of the previously mentioned packages but provide a more complete interface to the ICD system.
+
+***
+
+## Roadmap
+
+As one might have noticed, this package isn't the complete interface to the ICD system it strives to be. So, here's an outlook of what features are planned to be added soon:
+
+- [ ] Implementation of the latest revision ICD-11 ([issue #7])
+- [ ] A translation from ICD-10 to ICD-11 and back ([issue #8])
+- [ ] Adding modifiers to ICD-10 ([issue #3])
+- [ ] Enable exporting the codex in different formats ([issue #6])
+
+[issue #3]: https://github.com/rmnldwg/icd/issues/3
+[issue #6]: https://github.com/rmnldwg/icd/issues/6
+[issue #7]: https://github.com/rmnldwg/icd/issues/7
+[issue #8]: https://github.com/rmnldwg/icd/issues/8
+
+Stay tuned for updates!
