@@ -4,6 +4,7 @@ for the International statistical classification of diseases and related health
 problems (10th revision).
 """
 from __future__ import annotations
+
 from typing import Dict, List, Optional
 
 
@@ -240,10 +241,13 @@ class ICDEntry():
                 if block.should_contain(new_child):
                     block.add_child(new_child)
                     return
-                
+
                 if new_child.should_contain(block):
                     self.remove_child(block)
                     new_child.add_child(block)
+
+        if new_child.parent is not None:
+            new_child.parent.remove_child(new_child)
 
         new_child.parent = self
         self.children.append(new_child)
@@ -281,11 +285,11 @@ class ICDEntry():
         """
         res = []
 
+        if maxdepth is not None and maxdepth <= self.depth:
+            return res
+
         if self.code_matches(code):
             res = [self]
-
-        if maxdepth is not None and maxdepth <= self.depth:
-            return []
 
         for child in self.children:
             res = [*res, *child.search(code, maxdepth=maxdepth)]
@@ -299,11 +303,11 @@ class ICDEntry():
         With `maxdepth` you can choose how deep the method goes down the tree
         for the search. The `code` can be provided with or without the dot.
         """
-        if self.code_matches(code):
-            return True
-
         if maxdepth is not None and maxdepth <= self.depth:
             return False
+
+        if self.code_matches(code):
+            return True
 
         return any(child.exists(code, maxdepth) for child in self.children)
 

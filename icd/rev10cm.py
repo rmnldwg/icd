@@ -24,7 +24,7 @@ import untangle
 from rich.progress import Progress
 
 from ._config import DATA_DIR
-from .base import ICDEntry, ICDRoot, ICDChapter, ICDBlock, ICDCategory
+from .base import ICDBlock, ICDCategory, ICDChapter, ICDEntry, ICDRoot
 
 
 class ICD10CMEntry(ICDEntry):

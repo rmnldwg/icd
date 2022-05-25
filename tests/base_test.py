@@ -2,14 +2,13 @@
 Test the base classes from which the different revisions inherit the core
 functionality.
 """
-import pytest
-
 import hypothesis
 import hypothesis.strategies as st
-from hypothesis import given, assume
+import pytest
+from hypothesis import assume, given
 
 import icd
-from icd.base import ICDEntry, ICDRoot, ICDChapter, ICDBlock, ICDCategory
+from icd.base import ICDBlock, ICDCategory, ICDChapter, ICDEntry, ICDRoot
 
 
 def count_identical_seq(raw_list):
@@ -33,8 +32,10 @@ class TestICDEntry:
     Test the base implementation `icd.base.ICDEntry` from which all other
     classes inherit.
     """
+    # pylint: disable=no-method-argument
+    # pylint: disable=no-self-argument
     @st.composite
-    def entry(draw, kind=None):  # pylint: disable=no-method-argument
+    def entry(draw, kind=None):
         """
         Hypothesis strategy for generating `ICDEntry` instances.
         """
@@ -47,7 +48,7 @@ class TestICDEntry:
         return ICDEntry(code, title, kind)
 
     @st.composite
-    def root(draw):  # pylint: disable=no-method-argument
+    def root(draw):
         """
         Hypothesis strategy for generating `ICDEntry` instances.
         """
@@ -59,13 +60,28 @@ class TestICDEntry:
     @st.composite
     def linear_codex(draw, entry=entry(), root=root()):
         """Strategy for a linear codex."""
-        chain = draw(st.lists(entry, min_size=1))
+        chain = draw(st.lists(entry, min_size=2))
         for i, element in enumerate(chain):
             if i != 0:
                 chain[i-1].add_child(element)
         root = draw(root)
         root.add_child(chain[0])
         return root
+
+    @st.composite
+    def tree_codex(
+        draw,
+        linear_codex_list=st.lists(linear_codex(), min_size=2, max_size=10),
+        root=root()
+    ):
+        """Strategy for generating a tree-like codex."""
+        entry_list = [draw(root)]
+        for lin_cod in draw(linear_codex_list):
+            branch_point = draw(st.sampled_from(entry_list))
+            branch_point.add_child(lin_cod)
+            entry_list = [*entry_list, *list(lin_cod.entries)]
+
+        return entry_list[0]
 
 
     @given(
@@ -119,11 +135,12 @@ class TestICDEntry:
     )
     def test_release(self, linear_codex, release):
         """Check that the release of the root is returned."""
+        # pylint: disable=protected-access
         root = linear_codex.root
         leaf = next(linear_codex.leaves)
 
         assert root.is_root
-        root._release = release  # pylint: disable=protected-access
+        root._release = release
 
         assert leaf.release == release
 
@@ -259,11 +276,12 @@ class TestICDEntry:
     )
     def test__child_dict(self, entry, children):
         """Check the dictionary of children."""
+        # pylint: disable=protected-access
         child_codes = [child.code for child in children]
         assume(len(set(child_codes)) == len(child_codes))
         for child in children:
             entry.add_child(child)
-        child_dict = entry._child_dict  # pylint: disable=protected-access
+        child_dict = entry._child_dict
         assert all([child_dict[child.code] == child for child in children])
 
 
@@ -276,3 +294,54 @@ class TestICDEntry:
         root = linear_codex
         leaf = next(root.leaves)
         assert root.tree() == leaf.ancestry()
+
+
+    @given(
+        entry=entry(),
+        other_entry=entry(),
+        new_child=entry(),
+    )
+    def test_add_and_remove_child(self, entry, other_entry, new_child):
+        """Assert that the `add_child` method is as consistent as planned."""
+        other_entry.add_child(new_child)
+        entry.add_child(new_child)
+        assert new_child in entry.children
+        assert new_child not in other_entry.children
+        assert new_child.parent == entry
+
+        entry.add_child(new_child)
+        assert len(entry.children) == 1
+
+        entry.remove_child(new_child)
+        assert len(entry.children) == 0
+        assert new_child not in entry.children
+        assert new_child.parent is None
+
+
+    @given(
+        entry=entry(),
+    )
+    def test_code_matches(self, entry):
+        """Test the code-matching works"""
+        code = entry.code
+        dotless_code = code.replace('.', '')
+        assert entry.code_matches(code) and entry.code_matches(dotless_code)
+
+
+    @given(
+        tree_codex=tree_codex(),
+        maxdepth=st.integers(min_value=0, max_value=100)
+    )
+    def test_search_and_exists(self, tree_codex, maxdepth):
+        """Make sure the `search` method finds existing codes in a tree."""
+        for entry in tree_codex.entries:
+            code = entry.code
+            dotless_code = code.replace('.', '')
+            if maxdepth <= entry.depth:
+                assert entry not in tree_codex.search(code, maxdepth=maxdepth)
+            else:
+                assert (
+                    tree_codex.exists(code, maxdepth=maxdepth) and
+                    tree_codex.exists(dotless_code, maxdepth=maxdepth)
+                )
+                assert entry in tree_codex.search(code, maxdepth=maxdepth)

@@ -17,8 +17,8 @@ from __future__ import annotations
 import os
 from typing import Optional, TextIO
 
-import requests
 import pandas as pd
+import requests
 
 from ._config import DATA_DIR
 from .base import ICDBlock, ICDCategory, ICDChapter, ICDEntry, ICDRoot
