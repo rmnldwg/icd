@@ -403,7 +403,7 @@ class TestICDChapter:
     )
     def test_romanize(self, number, roman_numeral):
         """Make sure the romanization is correct."""
-        assert self.romanize(number) == roman_numeral
+        assert ICDChapter.romanize(number) == roman_numeral
 
 
 class TestICDBlock:
