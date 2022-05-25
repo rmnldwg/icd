@@ -162,9 +162,10 @@ class ICDEntry():
             return 1
         return self.parent.depth_in_kind + 1
 
-    @property
-    def _child_dict(self) -> Dict[str, ICDEntry]:
-        return {child.code: child for child in self.children}
+    def _child_dict(self, kind: Optional[str] = None) -> Dict[str, ICDEntry]:
+        if kind is not None:
+            return {c.code: c for c in self.children if c.kind == kind}
+        return {c.code: c for c in self.children}
 
     def tree(
         self,
@@ -349,7 +350,7 @@ class ICDRoot(ICDEntry):
         """Returns a dictionary containing all the ICD chapters loaded under a
         roman-numeral key. E.g., chapter 2 can be accessed via something like
         `root.chapter['II']`."""
-        return self._child_dict
+        return self._child_dict(kind="chapter")
 
 
 class ICDChapter(ICDEntry):
@@ -368,7 +369,7 @@ class ICDChapter(ICDEntry):
         """Returns a dictionary containing all blocks loaded for this chapter
         under a key corresponding to their ICD-range. E.g., block `C00-C96`
         contains all categories with codes ranging from `C00` to `C96`."""
-        return self._child_dict
+        return self._child_dict(kind="block")
 
     @staticmethod
     def romanize(number: int):
@@ -403,16 +404,14 @@ class ICDBlock(ICDEntry):
     def blocks(self) -> Optional[ICDBlock]:
         """Like :class:`ICDChapter`, a block might have blocks as children,
         which can be accessed in the exact same way as for the chapter."""
-        if len(self.children) > 0 and isinstance(self.children[0], ICDBlock):
-            return self._child_dict
+        return self._child_dict(kind="block")
 
     @property
     def categories(self) -> Optional[ICDCategory]:
         """In case the block does not have blocks, but categories as children,
         they can be accessed via the `category` attribute, which also returns a
         dictionary, just like `block`."""
-        if len(self.children) > 0 and isinstance(self.children[0], ICDCategory):
-            return self._child_dict
+        return self._child_dict(kind="category")
 
     def should_contain(self, block: ICDBlock) -> bool:
         """Check whether a given block should be contained by this block."""
@@ -442,4 +441,4 @@ class ICDCategory(ICDEntry):
         """If there exists a finer classification of the category, this
         property returns them as a dictionary of respective ICDs as key and the
         actual entry as value."""
-        return self._child_dict
+        return self._child_dict(kind="category")

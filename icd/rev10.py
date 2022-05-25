@@ -68,14 +68,15 @@ class ICD10Entry(ICDEntry):
             "client_id": icd_api_id,
             "client_secret": icd_api_secret,
             "scope": "icdapi_access",
-            "grantkind": "client_credentials"
+            "grant_type": "client_credentials"
         }
-        response = requests.post(token_endpoint, data=payload).json()
-        access_token = response["access_token"]
+        response = requests.post(token_endpoint, data=payload)
+        if response.status_code != requests.codes.ok:
+            raise requests.HTTPError("Access denied.")
+        access_token = response.json()["access_token"]
 
         # Make request
-        year = self.root.year
-        uri = f"https://id.who.int/icd/release/10/{year}/{self.code}"
+        uri = f"https://id.who.int/icd/release/10/{self.release}/{self.code}"
         headers = {
             "Authorization": "Bearer " + access_token,
             "Accept": "application/json",
@@ -98,7 +99,7 @@ class ICD10Entry(ICDEntry):
                     response=response
                 )
 
-        return response
+        return response.json()
 
 
 class ICD10Root(ICDRoot, ICD10Entry):
@@ -135,7 +136,7 @@ class ICD10Chapter(ICDChapter, ICD10Entry):
         if (
             isinstance(code, str)
             and
-            all([c in "IVXLCDM" for c in code])
+            all(c in "IVXLCDM" for c in code)
         ):
             super().__init__(code, title, *args, **kwargs)
             return
