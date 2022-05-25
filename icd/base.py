@@ -5,51 +5,61 @@ problems (10th revision).
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
 
-@dataclass
 class ICDEntry():
     """
-    Base dataclass representing an ICD chapter, block or category of ICD 10,
-    ICD 10-CM or ICD 11.
+    Base class representing an abstract ICD chapter, block or category of ICD
+    10, ICD 10-CM or ICD 11.
     """
-    code: str
-    """The chapter number, block range or ICD code of the entry."""
-    title: str
-    """Description of the chapter, block or category."""
-    revision: str = field(init=False)
-    kind: str = field(repr=False, default="entry")
-    """Can be `entry`, `root`, `chapter`, `block` or `category`."""
-    parent: Optional[ICDEntry] = field(
-        default=None, repr=False, compare=False
-    )
-    """Direct ancestor of the entry."""
-    children: List[ICDEntry] = field(
-        default_factory=lambda: [], repr=False, compare=False
-    )
-    """List of direct descendants of the entry."""
-
-    def __post_init__(self):
+    def __init__(
+        self,
+        code: str,
+        title: str,
+        kind: str,
+        parent: ICDEntry = None,
+        children: Optional[List[ICDEntry]] = None
+    ):
         """
-        Make sure `kind` & `revision` take on allowed values and get the
-        release & revision from the root of the codex.
+        Initialize base ICD entry and make sure `kind` & `revision`
+        attributes take on allowed values. The attribute `kind` can only be one
+        of 'root', 'chapter', 'block' or 'category', While currently this
+        package only supports the 10th and 11th revision along with the CDC's
+        clinical modification 10-CM as `revision` attribute.
         """
-        if self.kind not in ["entry", "root", "chapter", "block", "category"]:
+        if kind not in ["root", "chapter", "block", "category"]:
             raise ValueError(
                 "Attribute kind must be one of 'root', 'chapter', 'block' or "
-                "'category'"
+                f"'category', not {kind}"
             )
-        if self.revision not in ["10", "10-CM", "11"]:
-            raise ValueError(
-                "This package only supports ICD '10', '10-CM' or '11', not "
-                f"{self.revision}"
-            )
-        return
+
+        self.parent = None
+        if parent is not None:
+            if not issubclass(type(parent), ICDEntry):
+                raise TypeError(
+                    "Parent entry of an ICD entry must inherit from `ICDEntry`"
+                )
+            parent.add_child(self)
+
+        self.code = code
+        self.title = title
+        self.kind = kind
+
+        self.children = []
+        if children is not None:
+            for child in children:
+                self.add_child(child)
+
 
     def __str__(self):
         return f"{self.kind} {self.code}: {self.title}"
+
+    def __repr__(self):
+        return (
+            self.__class__.__name__ +
+            f"(code='{self.code}', title='{self.title}', kind='{self.kind}')"
+        )
 
     def __len__(self):
         return 1 + sum([len(child) for child in self.children])
@@ -62,8 +72,8 @@ class ICDEntry():
         """
         if isinstance(self, ICDRoot):
             return self._release
-        else:
-            return self.root.release
+
+        return self.root.release
 
     @release.setter
     def release(self, new_release):
@@ -71,8 +81,8 @@ class ICDEntry():
             raise AttributeError(
                 "Can only set attribute `release` on `ICDRoot` objects."
             )
-        else:
-            self._release = new_release
+
+        self._release = new_release
 
     @property
     def is_root(self) -> bool:
@@ -87,38 +97,38 @@ class ICDEntry():
         """Recursively find the root of the ICD codex from any entry."""
         if self.is_root:
             return self
-        else:
-            return self.parent.root
+
+        return self.parent.root
 
     @property
     def chapter(self):
         """If the entry is a block or category, return the chapter it is in."""
-        if self.kind in ["root", "chapter"]:
-            raise AttributeError("Root and chapter objects have no chapter")
-        elif self.parent.kind == "chapter":
-            return self.parent
-        else:
-            return self.parent.chapter
+        if self.kind == "root":
+            raise AttributeError("Not part of any chapter")
+
+        if self.kind == "chapter":
+            return self
+
+        return self.parent.chapter
 
     @property
     def block(self):
         """Return the closest ancestor that is a block."""
         if self.kind in ["root", "chapter"]:
-            raise AttributeError("Roots & chapters are not part of blocks")
-        elif self.parent.kind in ["root", "chapter"]:
-            raise AttributeError("This block is not part of any other block")
-        elif self.parent.kind == "block":
-            return self.parent
-        else:
-            return self.parent.block
+            raise AttributeError("Not part of any block")
+
+        if self.kind == "block":
+            return self
+
+        return self.parent.block
 
     @property
     def depth(self):
         """Return the depth of the entry in the codex tree."""
         if self.is_root:
             return 1
-        else:
-            return 1 + self.parent.depth
+
+        return 1 + self.parent.depth
 
     @property
     def is_leaf(self) -> bool:
@@ -152,14 +162,16 @@ class ICDEntry():
         a different kind, while a value of 2 means that the parent is still of
         the same kind, but the grantparent is different.
         """
-        if type(self.parent) != type(self):
+        if self.parent is None:
             return 1
-        else:
-            return self.parent.depth_in_kind + 1
+        if self.kind != self.parent.kind:
+            return 1
+        return self.parent.depth_in_kind + 1
 
-    @property
-    def _child_dict(self) -> Dict[str, ICDEntry]:
-        return {child.code: child for child in self.children}
+    def _child_dict(self, kind: Optional[str] = None) -> Dict[str, ICDEntry]:
+        if kind is not None:
+            return {c.code: c for c in self.children if c.kind == kind}
+        return {c.code: c for c in self.children}
 
     def tree(
         self,
@@ -209,15 +221,15 @@ class ICDEntry():
 
         if self.is_root:
             return ancestryprint(str(self) + "\n")
-        else:
-            n = self.depth - 2
-            return ancestryprint(
-                self.parent.ancestry(print_out=False)
-                + n * "    "
-                + "└───"
-                + str(self)
-                + "\n"
-            )
+
+        num = self.depth - 2
+        return ancestryprint(
+            self.parent.ancestry(print_out=False)
+            + num * "    "
+            + "└───"
+            + str(self)
+            + "\n"
+        )
 
     def add_child(self, new_child: ICDEntry):
         """
@@ -236,9 +248,13 @@ class ICDEntry():
                 if block.should_contain(new_child):
                     block.add_child(new_child)
                     return
-                elif new_child.should_contain(block):
+
+                if new_child.should_contain(block):
                     self.remove_child(block)
                     new_child.add_child(block)
+
+        if new_child.parent is not None:
+            new_child.parent.remove_child(new_child)
 
         new_child.parent = self
         self.children.append(new_child)
@@ -276,14 +292,15 @@ class ICDEntry():
         """
         res = []
 
+        if maxdepth is not None and maxdepth <= self.depth:
+            return res
+
         if self.code_matches(code):
             res = [self]
 
-        if maxdepth is not None and maxdepth <= self.depth:
-            return []
-
         for child in self.children:
             res = [*res, *child.search(code, maxdepth=maxdepth)]
+
         return res
 
     def exists(self, code: str, maxdepth: Optional[int] = None) -> bool:
@@ -293,13 +310,13 @@ class ICDEntry():
         With `maxdepth` you can choose how deep the method goes down the tree
         for the search. The `code` can be provided with or without the dot.
         """
-        if self.code_matches(code):
-            return True
-
         if maxdepth is not None and maxdepth <= self.depth:
             return False
 
-        return any([child.exists(code, maxdepth) for child in self.children])
+        if self.code_matches(code):
+            return True
+
+        return any(child.exists(code, maxdepth) for child in self.children)
 
     def get(
         self,
@@ -314,42 +331,34 @@ class ICDEntry():
         Set `maxdepth` to the maximum depth you want to go down the tree for
         the search.
         """
-        if self.code_matches(code) and self.kind == kind:
-            return self
-
         if maxdepth is not None and maxdepth <= self.depth:
             return None
+
+        if self.code_matches(code) and self.kind == kind:
+            return self
 
         for child in self.children:
             if (category := child.get(code, maxdepth)) is not None:
                 return category
 
 
-
-@dataclass
 class ICDRoot(ICDEntry):
     """
     Root of the ICD 10 tree. It serves as an entry point for the recursive
     parsing of the XML data file and also stores the version of the data.
     """
-    code: str = field(init=False)
-    title: str = field(init=False)
-    _release: str = ""
-    kind: str = field(repr=False, default="root")
-
-    def __post_init__(self):
-        super().__post_init__()
-        self.code = f"ICD-{self.revision}"
+    def __init__(self, code: str, title: str, release: str, *args, **kwargs):
+        super().__init__(code, title, *args, kind="root", **kwargs)
+        self._release = release
 
     @property
     def chapters(self) -> Dict[str, ICDChapter]:
         """Returns a dictionary containing all the ICD chapters loaded under a
         roman-numeral key. E.g., chapter 2 can be accessed via something like
         `root.chapter['II']`."""
-        return self._child_dict
+        return self._child_dict(kind="chapter")
 
 
-@dataclass
 class ICDChapter(ICDEntry):
     """
     One of the 22 chapters in the ICD codex. In the XML data obtained from the
@@ -358,17 +367,35 @@ class ICDChapter(ICDEntry):
     roman numerals to identify chapters, so the `code` attribute is converted.
     E.g., chapter `2` will be accessible from the root via `root.chapter['II']`.
     """
-    kind: str = field(repr=False, default="chapter")
+    def __init__(self, code: str, title: str, *args, **kwargs):
+        super().__init__(code, title, *args, kind="chapter", **kwargs)
 
     @property
     def blocks(self) -> Dict[str, ICDBlock]:
         """Returns a dictionary containing all blocks loaded for this chapter
         under a key corresponding to their ICD-range. E.g., block `C00-C96`
         contains all categories with codes ranging from `C00` to `C96`."""
-        return self._child_dict
+        return self._child_dict(kind="block")
+
+    @staticmethod
+    def romanize(number: int):
+        """Romanize an integer."""
+        units     = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX']
+        tens      = ['', 'X', 'XX', 'XXX', 'XL', 'L', 'LX', 'LXX', 'LXXX', 'XC']
+        hundrets  = ['', 'C', 'CC', 'CCC', 'CD', 'D', 'DC', 'DCC', 'DCCC', 'CM']
+        thousands = ['', 'M', 'MM', 'MMM']
+
+        roman_num = thousands[number // 1000]
+        number = number % 1000
+        roman_num += hundrets[number // 100]
+        number = number % 100
+        roman_num += tens[number // 10]
+        number = number % 10
+        roman_num += units[number]
+
+        return roman_num
 
 
-@dataclass
 class ICDBlock(ICDEntry):
     """
     A block of ICD codes within a chapter. A block specifies a range of ICD
@@ -376,22 +403,21 @@ class ICDBlock(ICDEntry):
     not necessarily categories as direct children. The `code` attribute of a
     block might be something like `C00-C96`.
     """
-    kind: str = field(repr=False, default="block")
+    def __init__(self, code: str, title: str, *args, **kwargs):
+        super().__init__(code, title, *args, kind="block", **kwargs)
 
     @property
     def blocks(self) -> Optional[ICDBlock]:
         """Like :class:`ICDChapter`, a block might have blocks as children,
         which can be accessed in the exact same way as for the chapter."""
-        if len(self.children) > 0 and isinstance(self.children[0], ICDBlock):
-            return self._child_dict
+        return self._child_dict(kind="block")
 
     @property
     def categories(self) -> Optional[ICDCategory]:
         """In case the block does not have blocks, but categories as children,
         they can be accessed via the `category` attribute, which also returns a
         dictionary, just like `block`."""
-        if len(self.children) > 0 and isinstance(self.children[0], ICDCategory):
-            return self._child_dict
+        return self._child_dict(kind="category")
 
     def should_contain(self, block: ICDBlock) -> bool:
         """Check whether a given block should be contained by this block."""
@@ -407,18 +433,18 @@ class ICDBlock(ICDEntry):
         return super().get(code, maxdepth)
 
 
-@dataclass
 class ICDCategory(ICDEntry):
     """
     A category of the ICD system. These are the only entries in the ICD codex
     for which the `code` attribute actually holds a valid ICD code in the regex
     form `[A-Z][0-9]{2}(.[0-9]{1,3})?`.
     """
-    kind: str = field(repr=False, default="category")
+    def __init__(self, code: str, title: str, *args, **kwargs):
+        super().__init__(code, title, *args, kind="category", **kwargs)
 
     @property
     def categories(self) -> ICDCategory:
         """If there exists a finer classification of the category, this
         property returns them as a dictionary of respective ICDs as key and the
         actual entry as value."""
-        return self._child_dict
+        return self._child_dict(kind="category")

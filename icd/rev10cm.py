@@ -17,7 +17,6 @@ following ways:
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass, field
 from typing import Optional
 
 import requests
@@ -25,12 +24,10 @@ import untangle
 from rich.progress import Progress
 
 from ._config import DATA_DIR
-from .rev10 import (ICD10Block, ICD10Category, ICD10Chapter, ICD10Entry,
-                    ICD10Root)
+from .base import ICDBlock, ICDCategory, ICDChapter, ICDEntry, ICDRoot
 
 
-@dataclass
-class ICD10CMEntry(ICD10Entry):
+class ICD10CMEntry(ICDEntry):
     """
     Class representing an entry in the ICD-10-CM system.
     """
@@ -55,23 +52,25 @@ class ICD10CMEntry(ICD10Entry):
 
         # a bit hacky (and potentially dangerous) way to get the array from
         # the returned string...
-        code_list = eval(response.content.decode())[3]
+        code_list = eval(response.content.decode().replace('null,', ''))[-1]
         return code_list
 
 
-@dataclass
-class ICD10CMRoot(ICD10Root, ICD10CMEntry):
+class ICD10CMRoot(ICDRoot, ICD10CMEntry):
     """
-    This subclass of `ICD10Root` implements its own `from_xml` method, because
+    This subclass of `ICDRoot` implements its own `from_xml` method, because
     the way the CDC and the WHO make their XML data available differs.
     """
-    title: str = field(init=False)
-
-    def __post_init__(self):
-        super().__post_init__()
-        self.title = (
-            "International Classification of Diseases, Tenth Revision, "
-            f"Clinical Modification, {self.release} release"
+    def __init__(self, release: str, *args, **kwargs):
+        super().__init__(
+            "ICD-10-CM root",
+            (
+                "International Classification of Diseases, Tenth Revision, "
+                f"Clinical Modification, {release} release"
+            ),
+            release,
+            *args,
+            **kwargs
         )
 
     @classmethod
@@ -80,15 +79,35 @@ class ICD10CMRoot(ICD10Root, ICD10CMEntry):
         Create root and entire ICD-10-CM tree from the root entry in the
         CDC's XML files.
         """
-        root = cls(_release=xml_root.version.cdata)
+        root = cls(release=xml_root.version.cdata)
         for xml_chapter in xml_root.chapter:
             root.add_child(ICD10CMChapter.from_xml(xml_chapter))
         return root
 
 
-class ICD10CMChapter(ICD10Chapter, ICD10CMEntry):
-    """Subclassing `ICD10Chapter` to implement the appropriate `from_xml`
-    parsing method."""
+class ICD10CMChapter(ICDChapter, ICD10CMEntry):
+    """
+    Subclassing `ICDChapter` to implement the appropriate `from_xml`
+    parsing method.
+    """
+    def __init__(self, code: str, title: str, *args, **kwargs):
+        """Romanize the chapter number if necessary."""
+        if (
+            isinstance(code, str)
+            and
+            all([c in "IVXLCDM" for c in code])
+        ):
+            super().__init__(code, title, *args, **kwargs)
+            return
+
+        try:
+            chapter_num = int(code)
+        except ValueError as val_err:
+            raise ValueError("Chapter number must be integer") from val_err
+
+        code = self.romanize(chapter_num)
+        super().__init__(code, title, *args, **kwargs)
+
     @classmethod
     def from_xml(cls, xml_chapter: untangle.Element) -> ICD10CMChapter:
         """Create chapter from respective XML chapter entry."""
@@ -102,11 +121,11 @@ class ICD10CMChapter(ICD10Chapter, ICD10CMEntry):
         return chapter
 
 
-class ICD10CMBlock(ICD10Block, ICD10CMEntry):
+class ICD10CMBlock(ICDBlock, ICD10CMEntry):
     """Subclassing `ICD10Block` to implement the appropriate `from_xml`
     parsing method."""
     @classmethod
-    def from_xml(cls, xml_section: untangle.Element) -> ICD10Block:
+    def from_xml(cls, xml_section: untangle.Element) -> ICD10CMBlock:
         """Create block of ICD-10-CM categories from XML section"""
         block = cls(
             code=xml_section["id"],
@@ -118,8 +137,42 @@ class ICD10CMBlock(ICD10Block, ICD10CMEntry):
 
         return block
 
+    @property
+    def start_code(self) -> str:
+        """Returns the first ICD code included in this block."""
+        return self.code.split("-", maxsplit=1)[0]
 
-class ICD10CMCategory(ICD10Category, ICD10CMEntry):
+    @property
+    def end_code(self) -> str:
+        """Respectively returns the last ICD code of the block."""
+        split_code = self.code.split("-")
+        if len(split_code) == 1:
+            return self.start_code
+        elif len(split_code) == 2:
+            return split_code[1]
+        else:
+            raise ValueError(
+                "Block code must be <start_code>-<end_code> or only <code>, "
+                f"but not {self.code}"
+            )
+
+    def should_contain(self, block: ICD10CMBlock) -> bool:
+        """Check whether this block should contain the given block"""
+        if not isinstance(block, ICD10CMBlock):
+            return False
+
+        if self == block:
+            return False
+
+        has_start_ge = block.start_code >= self.start_code
+        has_end_le = block.end_code <= self.end_code
+        if has_start_ge and has_end_le:
+            return True
+
+        return False
+
+
+class ICD10CMCategory(ICDCategory, ICD10CMEntry):
     """Subclassing `ICD10Category` to implement the appropriate `from_xml`
     parsing method."""
     @classmethod

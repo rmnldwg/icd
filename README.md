@@ -66,7 +66,7 @@ icd10cm_codex = icd.rev10cm.get_codex(release="2022")
 
 ### Chapters
 
-The created objects are both root nodes of the respective ICD tree. Directy under that, it contains the main chapters of the classification, which are accessible via a dictionary aptly named `chapters`
+The created objects are both root nodes of the respective ICD tree. Directy under that, it contains the main chapters of the classification, which are accessible via a dictionary aptly named `chapters`. The dictionary's keys are the codes of the chapters and the values the respective entry instance. For example
 
 ```python
 icd10_codex.chapters["IX"]
@@ -78,7 +78,7 @@ returns
 ICD10Chapter(code='IX', title='Diseases of the circulatory system', revision='10')
 ```
 
-⚠️ **NOTE:** There is also an attribute called `chapter`. But that attribute returns the parent chapter - if it has one - of the entry. This is a general pattern: The singular form (`root`, `chapter`, `block`) returns a parent entry (if available) while the plural form (`chapters`, `blocks`, `categories`) return dictionaries with keys of ICD codes and values of children elements.
+⚠️ **NOTE:** There is also an attribute called `chapter`. But that attribute returns the current entry's chapter, which is either the entry itself, if it *is* a chapter, or the chapter under which the entry is grouped. This is a general pattern: The singular form (`root`, `chapter`, `block`) returns the grouping *above* the current entry, while the plural form (`chapters`, `blocks`, `categories`) return dictionaries with keys of ICD codes and values of children elements *below*.
 
 ### Blocks
 
