@@ -149,7 +149,7 @@ class TestICDEntry:
         entry=st_entry(),
         parent=st_entry(),
     )
-    def test_is_st_root(self, entry, parent):
+    def test_is_root(self, entry, parent):
         """Assert that `is_root` property works."""
         assert entry.is_root
         assert parent.is_root
@@ -161,7 +161,7 @@ class TestICDEntry:
     @given(
         linear_codex=st_linear_codex()
     )
-    def test_st_root(self, linear_codex):
+    def test_root(self, linear_codex):
         """Test if correct root is returned."""
         root = linear_codex.root
 
