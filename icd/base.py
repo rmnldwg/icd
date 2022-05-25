@@ -55,6 +55,12 @@ class ICDEntry():
     def __str__(self):
         return f"{self.kind} {self.code}: {self.title}"
 
+    def __repr__(self):
+        return (
+            self.__class__.__name__ +
+            f"(code='{self.code}', title='{self.title}', kind='{self.kind}')"
+        )
+
     def __len__(self):
         return 1 + sum([len(child) for child in self.children])
 
