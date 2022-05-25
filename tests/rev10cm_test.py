@@ -9,7 +9,6 @@ import requests
 import untangle
 from hypothesis import assume, given, settings
 
-import icd
 from icd.base import ICDChapter, ICDEntry
 from icd.rev10cm import (ICD10CMBlock, ICD10CMCategory, ICD10CMChapter,
                          ICD10CMRoot, download_from_CDC, get_codex)
@@ -33,7 +32,7 @@ def test_entry(chapter_num, start_code, mid_code, end_code):
     """
     assume(start_code <= mid_code < end_code)
     release = "testrelease"
-    root = ICD10CMRoot(_release=release)
+    root = ICD10CMRoot(release=release)
     chapter = ICD10CMChapter(chapter_num, "Test Chapter")
     block = ICD10CMBlock(code=f"{start_code}-{end_code}", title="Test Block")
     sub_block1 = ICD10CMBlock(code=mid_code, title="Test Subblock 1")
@@ -57,23 +56,23 @@ def test_entry(chapter_num, start_code, mid_code, end_code):
     assert root.exists(chapter.code), "chapter doesn't seem to exist"
     assert chapter in root.search(chapter.code), "Didn't find chapter"
     with pytest.raises(AttributeError):
-        _ = chapter.chapter
+        _ = root.chapter
+    with pytest.raises(AttributeError):
+        _ = root.block
+    with pytest.raises(AttributeError):
+        _ = chapter.block
 
     assert root.exists(block.code), "block doesn't seem to exist"
     assert block in root.search(block.code), "Didn't find block"
     assert block.chapter == chapter, "Block's chapter wrong"
-    with pytest.raises(AttributeError):
-        _ = block.block
 
     assert root.exists(sub_block1.code), "sub block 1 doesn't seem to exist"
     assert sub_block1 in root.search(sub_block1.code), "Didn't find sub_block1"
     assert sub_block1.chapter == chapter, "Sub block 1's chapter wrong"
-    assert sub_block1.block == block, "Sub block 1's block must be block"
 
     assert root.exists(sub_block2.code), "sub block 2 doesn't seem to exist"
     assert sub_block2 in root.search(sub_block2.code), "Didn't find sub_block2"
     assert sub_block2.chapter == chapter, "Sub block 2's chapter wrong"
-    assert sub_block2.block == block, "Sub block 2's block must be block"
 
     assert root.exists(category.code), "category doesn't seem to exist"
     assert category in root.search(category.code), "Didn't find category"
@@ -164,7 +163,7 @@ def test_request(codex):
 def test_root(codex):
     root = codex
     assert isinstance(root, ICD10CMRoot), "Root must be `ICD10CMRoot` object."
-    assert root.code == "ICD-10-CM", "Root has wrong code"
+    assert root.code == "ICD-10-CM root", "Root has wrong code"
     exp_title = (
         "International Classification of Diseases, Tenth Revision, Clinical "
         f"Modification, {root.release} release"
