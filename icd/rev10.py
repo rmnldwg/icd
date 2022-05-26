@@ -54,8 +54,8 @@ class ICD10Entry(ICDEntry):
         selected by setting `lang`, e.g. to `"en"`.
         """
         if auth_method == "env":
-            icd_api_id = os.getenv("ICD_API_ID")
-            icd_api_secret = os.getenv("ICD_API_SECRET")
+            icd_api_id = os.environ["ICD_API_ID"]
+            icd_api_secret = os.environ["ICD_API_SECRET"]
         elif auth_method != "args":
             raise ValueError("`auth_method` must be either 'args' or 'env'.")
 
