@@ -19,11 +19,6 @@ jobs:
         uses: actions/setup-python@v3
         with:
           python-version: 3.8
-      - name: Check environment variables
-        run: |
-          echo $ICD_API_ID
-          echo $ICD_API_SECRET
-          echo $ANY_RANDOM_NAME
       - name: Install deps & package
         run: |
           python -m pip install --upgrade pip setuptools wheel
