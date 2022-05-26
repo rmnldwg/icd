@@ -21,9 +21,10 @@ jobs:
           pip install .[test]
       - name: Run tests
         run: |
-          export ICD_API_ID="${{ secrets.ICD_API_ID }}"
-          export ICD_API_SECRET="${{ secrets.ICD_API_SECRET }}"
           coverage run --omit=tests/*,*/_*.py -m pytest ./tests -vv
           coverage xml
+        env:
+          ICD_API_ID: ${{ secrets.ICD_API_ID }}
+          ICD_API_SECRET: ${{ secrets.ICD_API_SECRET }}
       - name: Upload to codecov
         uses: codecov/codecov-action@v2
