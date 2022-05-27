@@ -1,14 +1,11 @@
-from platform import release
-from numpy import isin
 import pytest
-from hypothesis import given, assume, settings
-from hypothesis import strategies as st
 import requests
+from hypothesis import assume, given, settings
+from hypothesis import strategies as st
 
 from icd.rev10 import (
     ICD10Block, ICD10Category, ICD10Chapter, ICD10Root, get_codex
 )
-
 
 ICD10_CODEX = get_codex()
 
@@ -27,7 +24,7 @@ def st_block(draw):
     """
     st_tmp_text = st.text(
         alphabet=st.characters(whitelist_categories=['L', 'N']),
-        min_size=1, 
+        min_size=1,
         max_size=5,
     )
     start_code = draw(st_tmp_text)

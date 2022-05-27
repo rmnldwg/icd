@@ -2,12 +2,10 @@
 Test the base classes from which the different revisions inherit the core
 functionality.
 """
-import hypothesis
 import hypothesis.strategies as st
 import pytest
-from hypothesis import assume, given
+from hypothesis import assume, given, settings
 
-import icd
 from icd.base import ICDBlock, ICDCategory, ICDChapter, ICDEntry, ICDRoot
 
 
@@ -151,7 +149,7 @@ class TestICDEntry:
         entry=st_entry(),
         parent=st_entry(),
     )
-    def test_is_st_root(self, entry, parent):
+    def test_is_root(self, entry, parent):
         """Assert that `is_root` property works."""
         assert entry.is_root
         assert parent.is_root
@@ -163,7 +161,7 @@ class TestICDEntry:
     @given(
         linear_codex=st_linear_codex()
     )
-    def test_st_root(self, linear_codex):
+    def test_root(self, linear_codex):
         """Test if correct root is returned."""
         root = linear_codex.root
 
@@ -331,6 +329,7 @@ class TestICDEntry:
         tree_codex=st_tree_codex(),
         maxdepth=st.integers(min_value=0, max_value=100)
     )
+    @settings(max_examples=10, deadline=10000)
     def test_search_exists_and_get(self, tree_codex, maxdepth):
         """Make sure the `search` method finds existing codes in a tree."""
         for entry in tree_codex.entries:
