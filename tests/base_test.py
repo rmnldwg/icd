@@ -9,6 +9,14 @@ from hypothesis import assume, given, settings
 from icd.base import ICDBlock, ICDCategory, ICDChapter, ICDEntry, ICDRoot
 
 
+CLS_DICT = {
+    "root": ICDRoot,
+    "chapter": ICDChapter,
+    "block": ICDBlock,
+    "category": ICDCategory,
+}
+
+
 def count_identical_seq(raw_list):
     """
     Count for each element how many preceeding elements are identical
@@ -27,44 +35,45 @@ def count_identical_seq(raw_list):
 # pylint: disable=no-method-argument
 # pylint: disable=no-self-argument
 @st.composite
-def st_entry(draw, kind=None):
+def st_entry(draw, kind=None, valid_kinds=None):
     """
     Hypothesis strategy for generating `ICDEntry` instances.
     """
-    code = draw(st.text())
-    title = draw(st.text())
+    alphabet = st.characters(whitelist_categories=['L','N'])
+    code = draw(st.text(alphabet=alphabet))
+    title = draw(st.text(alphabet=alphabet))
+    release = draw(st.text(alphabet=alphabet))
 
-    valid_kinds = ["root", "chapter", "block", "category"]
+    if valid_kinds is None:
+        valid_kinds = ["root", "chapter", "block", "category"]
+
     if kind is None:
         kind = draw(st.sampled_from(valid_kinds))
-    return ICDEntry(code, title, kind)
+
+    cls = CLS_DICT[kind]
+
+    return cls(code, title, release=release)
 
 @st.composite
-def st_root(draw):
-    """
-    Hypothesis strategy for generating `ICDEntry` instances.
-    """
-    code = draw(st.text())
-    title = draw(st.text())
-    release = draw(st.text())
-    return ICDRoot(code, title, release)
-
-@st.composite
-def st_linear_codex(draw, entry=st_entry(), root=st_root()):
+def st_linear_codex(
+    draw,
+    entry=st_entry(valid_kinds=["chapter", "block", "category"]), 
+    root=st_entry(kind="root")
+):
     """Strategy for a linear codex."""
+    root = draw(root)
     chain = draw(st.lists(entry, min_size=2))
+    root.add_child(chain[0])
     for i, element in enumerate(chain):
         if i != 0:
             chain[i-1].add_child(element)
-    root = draw(root)
-    root.add_child(chain[0])
     return root
 
 @st.composite
 def st_tree_codex(
     draw,
     linear_codex_list=st.lists(st_linear_codex(), min_size=2, max_size=10),
-    root=st_root()
+    root=st_entry(kind="root")
 ):
     """Strategy for generating a tree-like codex."""
     entry_list = [draw(root)]
@@ -84,40 +93,53 @@ class TestICDEntry:
     @given(
         code=st.text(),
         title=st.text(),
-        kind=st.one_of(
-            st.sampled_from(["root", "chapter", "block", "category"]),
-            st.text()
-        ),
-        parent=st.one_of(st_entry(), st.none()),
-        children=st.lists(st_entry())
+        parent=st_entry(),
+        children=st.lists(
+            st_entry(valid_kinds=["chapter", "block", "category"])
+        )
     )
-    def test___init__(self, code, title, kind, parent, children):
+    def test___init__(self, code, title, parent, children):
         """Test constructor"""
-        if kind not in ["root", "chapter", "block", "category"]:
-            with pytest.raises(ValueError):
-                instance = ICDEntry(code, title, kind, parent, children)
-        else:
-            with pytest.raises(TypeError):
-                instance = ICDEntry(code, title, kind, "not-an-entry", children)
+        with pytest.raises(TypeError):
+            instance = ICDEntry(
+                code,
+                title,
+                parent="not-an-entry",
+                children=children
+            )
+        instance = ICDEntry(
+            code,
+            title,
+            parent=parent,
+            children=children
+        )
+        assert instance.code == code
+        assert instance.title == title
 
-            instance = ICDEntry(code, title, kind, parent, children)
+        if parent is not None:
+            assert instance.parent == parent
+            assert instance in parent.children
 
-            assert instance.code == code
-            assert instance.title == title
-            assert instance.kind == kind
-
-            if parent is not None:
-                assert instance.parent == parent
-                assert instance in parent.children
-
-            assert all(child in instance.children for child in children)
-            assert all(instance == child.parent for child in children)
+        assert all(child in instance.children for child in children)
+        assert all(instance == child.parent for child in children)
 
 
     @given(entry=st_entry())
     def test___str__(self, entry):
         """Test string representation."""
         assert str(entry) == f"{entry.kind} {entry.code}: {entry.title}"
+
+
+    @given(entry=st_entry())
+    def test___repr__(self, entry):
+        """Check that the `__repr__` method can reproduce the instance."""
+        # pylint: disable=eval-used
+        repr_str = entry.__repr__()
+        repr_entry = eval(repr_str)
+        assert isinstance(repr_entry, type(entry))
+        assert entry.code == repr_entry.code
+        assert entry.title == repr_entry.title
+        assert entry.kind == repr_entry.kind
 
 
     @given(entry=st_entry())
@@ -146,16 +168,16 @@ class TestICDEntry:
 
 
     @given(
-        entry=st_entry(),
-        parent=st_entry(),
+        entry=st_entry(valid_kinds=["chapter", "block", "category"]),
+        parent=st_entry(kind="root"),
     )
     def test_is_root(self, entry, parent):
         """Assert that `is_root` property works."""
-        assert entry.is_root
+        assert not entry.is_root
         assert parent.is_root
         parent.add_child(entry)
-        assert parent.is_root
         assert not entry.is_root
+        assert parent.is_root
 
 
     @given(
@@ -212,7 +234,10 @@ class TestICDEntry:
 
     @given(
         entry=st_entry(),
-        children=st.lists(st_entry(), min_size=1)
+        children=st.lists(
+            st_entry(valid_kinds=["chapter", "block", "category"]),
+            min_size=1
+        )
     )
     def test_is_leaf(self, entry, children):
         """Test if `is_leaf` works correctly."""
@@ -226,7 +251,10 @@ class TestICDEntry:
 
     @given(
         entry=st_entry(),
-        children=st.lists(st_entry(), min_size=1)
+        children=st.lists(
+            st_entry(valid_kinds=["chapter", "block", "category"]),
+            min_size=1
+        )
     )
     def test_leaves(self, entry, children):
         """Check `leaves` property returns all leaf entries."""
@@ -238,7 +266,10 @@ class TestICDEntry:
 
     @given(
         linear_codex=st_linear_codex(),
-        children=st.lists(st_entry(), min_size=1)
+        children=st.lists(
+            st_entry(valid_kinds=["chapter", "block", "category"]),
+            min_size=1
+        )
     )
     def test_entries(self, linear_codex, children):
         """Check `leaves` property returns all leaf entries."""
@@ -269,7 +300,10 @@ class TestICDEntry:
 
     @given(
         entry=st_entry(),
-        children=st.lists(st_entry(), min_size=1)
+        children=st.lists(
+            st_entry(valid_kinds=["chapter", "block", "category"]),
+            min_size=1
+        )
     )
     def test__child_dict(self, entry, children):
         """Check the dictionary of children."""
@@ -296,9 +330,10 @@ class TestICDEntry:
     @given(
         entry=st_entry(),
         other_entry=st_entry(),
-        new_child=st_entry(),
+        new_child=st_entry(valid_kinds=["chapter", "block", "category"]),
+        root=st_entry(kind="root"),
     )
-    def test_add_and_remove_child(self, entry, other_entry, new_child):
+    def test_add_and_remove_child(self, entry, other_entry, new_child, root):
         """Assert that the `add_child` method is as consistent as planned."""
         other_entry.add_child(new_child)
         entry.add_child(new_child)
@@ -313,6 +348,9 @@ class TestICDEntry:
         assert len(entry.children) == 0
         assert new_child not in entry.children
         assert new_child.parent is None
+
+        entry.add_child(root)
+        assert root not in entry.children
 
 
     @given(

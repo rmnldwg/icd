@@ -6,6 +6,7 @@ problems (10th revision).
 from __future__ import annotations
 
 from typing import Dict, List, Optional
+import warnings
 
 
 class ICDEntry():
@@ -13,27 +14,22 @@ class ICDEntry():
     Base class representing an abstract ICD chapter, block or category of ICD
     10, ICD 10-CM or ICD 11.
     """
+    _kind = None
+
     def __init__(
         self,
         code: str,
         title: str,
-        kind: str,
         parent: ICDEntry = None,
-        children: Optional[List[ICDEntry]] = None
+        children: Optional[List[ICDEntry]] = None,
+        **_kwargs
     ):
         """
-        Initialize base ICD entry and make sure `kind` & `revision`
-        attributes take on allowed values. The attribute `kind` can only be one
-        of 'root', 'chapter', 'block' or 'category', While currently this
-        package only supports the 10th and 11th revision along with the CDC's
-        clinical modification 10-CM as `revision` attribute.
+        Initialize base ICD entry and make sure the `revision` attribute takes
+        on allowed values. This package only supports the 10th and 11th
+        revision along with the CDC's clinical modification 10-CM as
+        `revision` attribute.
         """
-        if kind not in ["root", "chapter", "block", "category"]:
-            raise ValueError(
-                "Attribute kind must be one of 'root', 'chapter', 'block' or "
-                f"'category', not {kind}"
-            )
-
         self.parent = None
         if parent is not None:
             if not issubclass(type(parent), ICDEntry):
@@ -44,7 +40,6 @@ class ICDEntry():
 
         self.code = code
         self.title = title
-        self.kind = kind
 
         self.children = []
         if children is not None:
@@ -56,13 +51,25 @@ class ICDEntry():
         return f"{self.kind} {self.code}: {self.title}"
 
     def __repr__(self):
-        return (
-            self.__class__.__name__ +
-            f"(code='{self.code}', title='{self.title}', kind='{self.kind}')"
-        )
+        repr_str = self.__class__.__name__ + f"('{self.code}', '{self.title}'"
+        if self.is_root:
+            repr_str += f", release='{self.release}'"
+        repr_str += ")"
+        return repr_str
 
     def __len__(self):
         return 1 + sum([len(child) for child in self.children])
+
+    @property
+    def kind(self):
+        """
+        Returns the kind of node the entry belongs to. Can only be `root` - for
+        the root of the codex tree - `chapter`, `block` and finally `category`.
+        """
+        if self._kind not in ["root", "chapter", "block", "category"]:
+            raise AttributeError("Attribute `kind` is misconfigured.")
+
+        return self._kind
 
     @property
     def release(self):
@@ -70,14 +77,14 @@ class ICDEntry():
         The release of the ICD codex. E.g. `2022` for the release including
         corrections made prior to the year 2022.
         """
-        if isinstance(self, ICDRoot):
+        if self.is_root:
             return self._release
 
         return self.root.release
 
     @release.setter
     def release(self, new_release):
-        if not isinstance(self, ICDRoot):
+        if not self.is_root:
             raise AttributeError(
                 "Can only set attribute `release` on `ICDRoot` objects."
             )
@@ -90,7 +97,7 @@ class ICDEntry():
         Only `True` for the `ICDRoot` element that is at the top of the codex
         tree.
         """
-        return self.parent is None
+        return issubclass(type(self), ICDRoot) and self.parent is None
 
     @property
     def root(self) -> ICDRoot:
@@ -237,7 +244,12 @@ class ICDEntry():
         is a block that would actually belong in an existing block, put it
         there instead.
         """
+        if issubclass(type(new_child), ICDRoot):
+            warnings.warn("Cannot add root as child; skipping")
+            return
+
         if new_child in self.children:
+            warnings.warn(f"{new_child} is already child of {self}; skipping")
             return
 
         are_children_block = all(
@@ -347,8 +359,10 @@ class ICDRoot(ICDEntry):
     Root of the ICD 10 tree. It serves as an entry point for the recursive
     parsing of the XML data file and also stores the version of the data.
     """
+    _kind = "root"
+
     def __init__(self, code: str, title: str, release: str, *args, **kwargs):
-        super().__init__(code, title, *args, kind="root", **kwargs)
+        super().__init__(code, title, *args, **kwargs)
         self._release = release
 
     @property
@@ -367,8 +381,10 @@ class ICDChapter(ICDEntry):
     roman numerals to identify chapters, so the `code` attribute is converted.
     E.g., chapter `2` will be accessible from the root via `root.chapter['II']`.
     """
+    _kind = "chapter"
+
     def __init__(self, code: str, title: str, *args, **kwargs):
-        super().__init__(code, title, *args, kind="chapter", **kwargs)
+        super().__init__(code, title, *args, **kwargs)
 
     @property
     def blocks(self) -> Dict[str, ICDBlock]:
@@ -403,8 +419,10 @@ class ICDBlock(ICDEntry):
     not necessarily categories as direct children. The `code` attribute of a
     block might be something like `C00-C96`.
     """
+    _kind = "block"
+
     def __init__(self, code: str, title: str, *args, **kwargs):
-        super().__init__(code, title, *args, kind="block", **kwargs)
+        super().__init__(code, title, *args, **kwargs)
 
     @property
     def blocks(self) -> Optional[ICDBlock]:
@@ -420,11 +438,14 @@ class ICDBlock(ICDEntry):
         return self._child_dict(kind="category")
 
     def should_contain(self, block: ICDBlock) -> bool:
-        """Check whether a given block should be contained by this block."""
-        raise NotImplementedError(
-            "Method to check whether one block should contain another needs to "
-            "be implemented in inheriting classes."
-        )
+        """Check whether a given block should be contained by this block.
+
+        This method should be overriden by any inheriting class with some
+        custom logic to check whether a block should actually be contained in
+        another one based e.g. on the code of the block. The base always
+        returns `False`.
+        """
+        return False
 
     def find(self, code: str, maxdepth:int = None) -> ICDBlock:
         """Stop searching when code is surely not in block."""
@@ -439,8 +460,10 @@ class ICDCategory(ICDEntry):
     for which the `code` attribute actually holds a valid ICD code in the regex
     form `[A-Z][0-9]{2}(.[0-9]{1,3})?`.
     """
+    _kind = "category"
+
     def __init__(self, code: str, title: str, *args, **kwargs):
-        super().__init__(code, title, *args, kind="category", **kwargs)
+        super().__init__(code, title, *args, **kwargs)
 
     @property
     def categories(self) -> ICDCategory:

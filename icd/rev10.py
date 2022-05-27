@@ -217,7 +217,7 @@ class ICD10Block(ICDBlock, ICD10Entry):
         if has_start_ge and has_end_le:
             return True
 
-        return False
+        return super().should_contain(block)
 
 
 class ICD10Category(ICDCategory, ICD10Entry):
