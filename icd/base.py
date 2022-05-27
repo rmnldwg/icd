@@ -5,8 +5,8 @@ problems (10th revision).
 """
 from __future__ import annotations
 
-from typing import Dict, List, Optional
 import warnings
+from typing import Dict, List, Optional
 
 
 class ICDEntry():

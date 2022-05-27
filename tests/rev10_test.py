@@ -3,9 +3,8 @@ import requests
 from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 
-from icd.rev10 import (
-    ICD10Block, ICD10Category, ICD10Chapter, ICD10Root, get_codex
-)
+from icd.rev10 import (ICD10Block, ICD10Category, ICD10Chapter, ICD10Root,
+                       get_codex)
 
 ICD10_CODEX = get_codex()
 

@@ -8,7 +8,6 @@ from hypothesis import assume, given, settings
 
 from icd.base import ICDBlock, ICDCategory, ICDChapter, ICDEntry, ICDRoot
 
-
 CLS_DICT = {
     "root": ICDRoot,
     "chapter": ICDChapter,
@@ -57,7 +56,7 @@ def st_entry(draw, kind=None, valid_kinds=None):
 @st.composite
 def st_linear_codex(
     draw,
-    entry=st_entry(valid_kinds=["chapter", "block", "category"]), 
+    entry=st_entry(valid_kinds=["chapter", "block", "category"]),
     root=st_entry(kind="root")
 ):
     """Strategy for a linear codex."""
