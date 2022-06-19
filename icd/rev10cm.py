@@ -169,7 +169,7 @@ class ICD10CMBlock(ICDBlock, ICD10CMEntry):
         if has_start_ge and has_end_le:
             return True
 
-        return False
+        return super().should_contain(block)
 
 
 class ICD10CMCategory(ICDCategory, ICD10CMEntry):
