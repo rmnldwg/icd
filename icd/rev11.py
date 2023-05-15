@@ -15,6 +15,7 @@ The underlying offical data can be obtained from the
 from __future__ import annotations
 
 import os
+import re
 from typing import Optional, TextIO
 
 import pandas as pd
@@ -28,14 +29,6 @@ class ICD11Entry(ICDEntry):
     """
     Class representing any entry in the 11th revision of ICD.
     """
-    foundation_uri: str = field(init=True, default=None)
-    """Unique identifier for an entry that will not change. Only exists since
-    revision 11 of the ICD codex. Not all entries have foundation URIs. Some
-    sub-entries are only modifications of an entry and hence only have a
-    `linearization_uri`."""
-    linearization_uri: str = field(init=True, default=None)
-    """Unique URI for the specific linearization. All entries except the root
-    have a linearization URI."""
     revision: str = "11"
     """Major revision of the ICD codex"""
 
@@ -99,8 +92,10 @@ class ICD11Chapter(ICDChapter, ICD11Entry):
         l1_block_rows = table.loc[is_l1_block]
 
         for l1_block_row in l1_block_rows:
-            l1_block_id = l1_block_row["BlockId"]
-            l1_block_table = table.loc[table["Grouping1"] == l1_block_id]
+            l1_block_table = table.loc[
+                (table["BlockId"] == l1_block_row["BlockId"])
+                | (table["Grouping1"] == l1_block_row["BlockId"])
+            ]
             chapter.add_child(ICD11Block.from_table(l1_block_table))
 
         return chapter
@@ -110,5 +105,5 @@ class ICD11Block(ICDBlock, ICD11Entry):
     """"""
     @classmethod
     def from_table(cls, table: pd.DataFrame) -> ICD11Block:
-        """"""
+        """Create a block (and sub-blocks) from a pandas `DataFrame`."""
         return cls()
