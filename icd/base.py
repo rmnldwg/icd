@@ -5,6 +5,7 @@ problems (10th revision).
 """
 from __future__ import annotations
 from functools import lru_cache
+import logging
 
 import os
 import warnings
@@ -49,7 +50,7 @@ def _fetch_access_token(
     del ttl_hash
 
     if icd_api_id is None or icd_api_secret is None:
-        raise ValueError("Both env vars ICD_API_ID and ICD_API_SECRET must be set.")
+        logging.warning("ICD_API_ID or ICD_API_SECRET not set, authentication might fail.")
 
     token_endpoint = "https://icdaccessmanagement.who.int/connect/token"
     payload = {

@@ -13,21 +13,24 @@ The underlying offical data can be obtained from the
 [download]: https://icd.who.int/browse11/Downloads/Download?fileName=simpletabulation.zip
 """
 from __future__ import annotations
-import code
 
-import os
-from platform import release
 import re
-from typing import Optional, TextIO
-import logging
+from typing import Callable
 
 import pandas as pd
 import requests
+from rich.progress import (
+    Progress,
+    TextColumn,
+    BarColumn,
+    MofNCompleteColumn,
+    TimeElapsedColumn,
+)
 
 from icd.base import ICDBlock
 
-from ._config import DATA_DIR
-from .base import (
+from icd._config import DATA_DIR
+from icd.base import (
     ICDBlock,
     ICDCategory,
     ICDChapter,
@@ -36,9 +39,6 @@ from .base import (
     create_headers,
     get_hostname,
 )
-
-
-logging.basicConfig(level=os.getenv("ICD_LOG_LEVEL", "INFO"))
 
 
 def fetch_description_from_linearization(
@@ -58,11 +58,10 @@ def fetch_description_from_linearization(
     'A condition characterised by the dysfunction or lack of function of a surgically created urine reservoir within the body, specifically along the path by which urine enters the pouch.'
     """
     hostname = get_hostname()
-    uri = f"{hostname}/icd/release/11/{release_id}/{linearization_name}/{numeric_id}"
+    uri = f"http://{hostname}/icd/release/11/{release_id}/{linearization_name}/{numeric_id}"
     response = requests.get(uri, headers=create_headers(api_ver=api_ver))
     response.raise_for_status()
     parsed_response = response.json()
-    logging.debug(parsed_response)
 
     if "definition" in parsed_response:
         return parsed_response["definition"]["@value"]
@@ -92,11 +91,10 @@ def fetch_description_from_code(
     'A disorder characterised by low levels of high-density lipoprotein in the blood.'
     """
     hostname = get_hostname()
-    uri = f"{hostname}/icd/release/11/{release_id}/{linearization_name}/codeinfo/{code}"
+    uri = f"http://{hostname}/icd/release/11/{release_id}/{linearization_name}/codeinfo/{code}"
     response = requests.get(uri, headers=create_headers(api_ver=api_ver))
     response.raise_for_status()
     parsed_response = response.json()
-    logging.debug(parsed_response)
 
     if "stemId" in parsed_response:
         linearization_uri = parsed_response["stemId"]
@@ -105,7 +103,6 @@ def fetch_description_from_code(
             numeric_id=numeric_id,
             release_id=release_id,
             linearization_name=linearization_name,
-            hostname=hostname,
         )
 
     return ""
@@ -123,6 +120,19 @@ class ICD11Entry(ICDEntry):
     revision: str = "11"
     """Major revision of the ICD codex"""
 
+    def description(self) -> str:
+        """
+        Get the description of the entry from the ICD API.
+
+        Example:
+        >>> ICD11Entry(code="EK11", title="Protein contact dermatitis").description()
+        'Immediate contact dermatitis due to exposure to proteins from plants, animal tissue and other organic matter.'
+        """
+        if not hasattr(self, "_description") or self._description is None:
+            self._description = fetch_description_from_code(self.code)
+
+        return self._description
+
 
 class ICD11Root(ICDRoot, ICD11Entry):
     """
@@ -131,7 +141,7 @@ class ICD11Root(ICDRoot, ICD11Entry):
     """
 
     @classmethod
-    def from_table(cls, table: pd.DataFrame) -> ICD11Root:
+    def from_table(cls, table: pd.DataFrame, advance: Callable) -> ICD11Root:
         """
         Create root from a pandas table and initialize codex generation
         """
@@ -143,15 +153,14 @@ class ICD11Root(ICDRoot, ICD11Entry):
             ),
             release="2023-01",   # At the time of writing, this is the latest release
         )
+        advance()
 
         is_chapter = table["ClassKind"] == "chapter"
         is_not_V_or_X = table["ChapterNo"].str.match(r"^[^VX]")
         chapter_rows = table.loc[is_chapter & is_not_V_or_X]
 
-        logging.debug(f"Found {len(chapter_rows)} chapters in the table")
-
         for _, chapter_row in chapter_rows.iterrows():
-            chapter = ICD11Chapter.from_series(chapter_row, table)
+            chapter = ICD11Chapter.from_series(chapter_row, table, advance=advance)
             root.add_child(chapter)
 
         return root
@@ -162,7 +171,12 @@ class ICD11Chapter(ICDChapter, ICD11Entry):
     Subclass of the general `ICDChapter` adapted for the 11th revision of the ICD.
     """
     @classmethod
-    def from_series(cls, series: pd.Series, table: pd.DataFrame) -> ICD11Chapter:
+    def from_series(
+        cls,
+        series: pd.Series,
+        table: pd.DataFrame,
+        advance: Callable,
+    ) -> ICD11Chapter:
         """
         Create chapter from a pandas series.
         """
@@ -170,16 +184,15 @@ class ICD11Chapter(ICDChapter, ICD11Entry):
             code=series["ChapterNo"],
             title=strip_dashes(series["Title"]),
         )
+        advance()
 
         is_block = table["ClassKind"] == "block"
         is_same_chapter = table["ChapterNo"] == chapter.code
         has_depth_1 = table["DepthInKind"] == 1
         block_rows = table.loc[is_block & is_same_chapter & has_depth_1]
 
-        logging.debug(f"Found {len(block_rows)} blocks in chapter {chapter.code}")
-
         for _, block_row in block_rows.iterrows():
-            block = ICD11Block.from_series(block_row, table)
+            block = ICD11Block.from_series(block_row, table, advance=advance)
             chapter.add_child(block)
 
         return chapter
@@ -190,7 +203,12 @@ class ICD11Block(ICDBlock, ICD11Entry):
     Subclass of the general `ICDBlock` adapted for the 11th revision of the ICD.
     """
     @classmethod
-    def from_series(cls, series: pd.Series, table: pd.DataFrame) -> ICD11Block:
+    def from_series(
+        cls,
+        series: pd.Series,
+        table: pd.DataFrame,
+        advance: Callable,
+    ) -> ICD11Block:
         """
         Create block from a pandas series.
         """
@@ -198,6 +216,7 @@ class ICD11Block(ICDBlock, ICD11Entry):
             code=series["BlockId"],
             title=strip_dashes(series["Title"]),
         )
+        advance()
         block_depth = series["DepthInKind"]
 
         is_block = table["ClassKind"] == "block"
@@ -210,19 +229,15 @@ class ICD11Block(ICDBlock, ICD11Entry):
 
         sub_block_rows = table.loc[is_block & is_descendant & is_not_deeper]
 
-        logging.debug(f"Found {len(sub_block_rows)} sub-blocks in block {block.code}")
-
         for _, sub_block_row in sub_block_rows.iterrows():
-            sub_block = ICD11Block.from_series(sub_block_row, table)
+            sub_block = ICD11Block.from_series(sub_block_row, table, advance=advance)
             block.add_child(sub_block)
 
         is_category = table["ClassKind"] == "category"
         categery_rows = table.loc[is_category & is_descendant & is_not_deeper]
 
-        logging.debug(f"Found {len(categery_rows)} categories in block {block.code}")
-
         for _, category_row in categery_rows.iterrows():
-            category = ICD11Category.from_series(category_row, table)
+            category = ICD11Category.from_series(category_row, table, advance=advance)
             block.add_child(category)
 
         return block
@@ -241,7 +256,12 @@ class ICD11Category(ICDCategory, ICD11Entry):
     Subclass of the general `ICDCategory` adapted for the 11th revision of the ICD.
     """
     @classmethod
-    def from_series(cls, series: pd.Series, table: pd.DataFrame) -> ICD11Category:
+    def from_series(
+        cls,
+        series: pd.Series,
+        table: pd.DataFrame,
+        advance: Callable,
+    ) -> ICD11Category:
         """
         Create category from a pandas series.
         """
@@ -249,6 +269,7 @@ class ICD11Category(ICDCategory, ICD11Entry):
             code=series["Code"],
             title=strip_dashes(series["Title"]),
         )
+        advance()
         category_depth = series["DepthInKind"]
 
         if series["isLeaf"]:
@@ -259,10 +280,32 @@ class ICD11Category(ICDCategory, ICD11Entry):
         does_code_match = table["Code"].str.startswith(category.code, na=False)
         sub_category_rows = table.loc[is_category & has_depth_plus_1 & does_code_match]
 
-        logging.debug(f"Found {len(sub_category_rows)} sub-categories in category {category.code}")
-
         for _, sub_category_row in sub_category_rows.iterrows():
-            sub_category = ICD11Category.from_series(sub_category_row, table)
+            sub_category = ICD11Category.from_series(sub_category_row, table, advance=advance)
             category.add_child(sub_category)
 
         return category
+
+
+def get_codex(verbose: bool = True) -> ICD11Root:
+    """
+    Get the entire ICD 11 codex as an `ICD11Root` object.
+    """
+    table = pd.read_csv(DATA_DIR / "icd-11" / "simpletabulation.csv", low_memory=False)
+    is_not_V_or_X = table["ChapterNo"].str.match(r"^[^VX]")
+
+    with Progress(
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        MofNCompleteColumn(),
+        TimeElapsedColumn(),
+    ) as progress:
+        task = progress.add_task(
+            "Generating ICD 11 codex...",
+            total=is_not_V_or_X.sum(),
+            visible=verbose,
+        )
+        advance = lambda: progress.update(task, advance=1)
+        codex = ICD11Root.from_table(table, advance=advance)
+
+    return codex

@@ -12,9 +12,6 @@ which requires one to be logged in to access the underlying files.
 """
 from __future__ import annotations
 
-import os
-from typing import Optional
-
 import requests
 import untangle
 from rich.progress import track
@@ -27,7 +24,6 @@ from .base import (
     ICDEntry,
     ICDRoot,
     create_headers,
-    fetch_access_token,
 )
 
 
