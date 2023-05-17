@@ -8,7 +8,7 @@ from icd._config import DATA_DIR
 
 def test_codex_creation():
     """Check if the codex gets generated correclty."""
-    data_table = pd.read_csv(DATA_DIR / "icd-11" / "simpletabulation.csv")
+    data_table = pd.read_csv(DATA_DIR / "icd-11" / "simpletabulation.csv", low_memory=False)
     root = ICD11Root.from_table(data_table)
 
     assert root.is_root
@@ -21,5 +21,7 @@ def test_codex_creation():
 
     scc_of_pharyngeal_tonsil = root.get("2B6B.20")
     assert scc_of_pharyngeal_tonsil.code == "2B6B.20"
+    assert scc_of_pharyngeal_tonsil.title == "Squamous cell carcinoma of pharyngeal tonsil"
     assert scc_of_pharyngeal_tonsil.is_leaf
     assert scc_of_pharyngeal_tonsil.parent == root.get("2B6B.2")
+    assert scc_of_pharyngeal_tonsil.root == root

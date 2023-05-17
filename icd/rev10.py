@@ -222,13 +222,13 @@ def get_codex(release: str = "2019", verbose: bool = False) -> ICD10Root:
     xml_path = DATA_DIR / "icd-10" / f"icd10{release}en.xml"
 
     verboseprint(f"Looking for XML file at {xml_path}...", end="")
-    if not os.path.exists(xml_path):
+    if not xml_path.exists() or not xml_path.is_file():
         verboseprint("FAILED")
         raise IOError(f"File {xml_path} does not exist")
     verboseprint("FOUND")
 
     verboseprint("Parsing XML...", end="")
-    xml_root = untangle.parse(xml_path).ClaML
+    xml_root = untangle.parse(str(xml_path)).ClaML
     verboseprint("SUCCESS")
 
     root = ICD10Root.from_xml(xml_title=xml_root.Title)

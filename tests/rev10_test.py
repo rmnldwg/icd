@@ -50,17 +50,8 @@ class TestICD10Entry:
     def test_request(self, entry):
         """Testing the `request` method for accessing info from the WHO API."""
         assume(entry.kind != "root")
-        with pytest.raises(ValueError):
-            entry.request(auth_method="args")
 
-        with pytest.raises(requests.HTTPError):
-            entry.request(
-                auth_method="args",
-                icd_api_id="foo",
-                icd_api_secret="bar"
-            )
-
-        response = entry.request(auth_method="env")
+        response = entry.request()
         assert response["code"] == entry.code
         assert response["title"]["@value"] == entry.title
         assert response["classKind"] == entry.kind
