@@ -20,7 +20,15 @@ import untangle
 from rich.progress import track
 
 from ._config import DATA_DIR
-from .base import ICDBlock, ICDCategory, ICDChapter, ICDEntry, ICDRoot
+from .base import (
+    ICDBlock,
+    ICDCategory,
+    ICDChapter,
+    ICDEntry,
+    ICDRoot,
+    create_headers,
+    fetch_access_token,
+)
 
 
 class ICD10Entry(ICDEntry):
@@ -29,23 +37,12 @@ class ICD10Entry(ICDEntry):
     """
     revision: str = "10"
 
-    def request(
-        self,
-        auth_method: str = "args",
-        icd_api_id: Optional[str] = None,
-        icd_api_secret: Optional[str] = None,
-        api_ver: int = 2,
-        lang: str = "en",
-    ) -> str:
+    def request(self, api_ver: int = 2) -> str:
         """
         Return information on an entry from WHO's ICD API.
 
-        This function provides two ways for authenticating to the API: One can
-        simply provide the `ClientId` as `icd_api_id` and the `ClientSecret` as
-        `icd_api_secret`, in which case `auth_method` must be set to `"args"`.
-        Or the two strings can be set as environment variables aptly named
-        `ICD_API_ID` and `ICD_API_SECRET`. In that case, set `auth_method` to
-        `"env"`.
+        For this to work, one needs to set the environment variables aptly named
+        `ICD_API_ID` and `ICD_API_SECRET`.
 
         There are two major versions of the ICD API that can be chosen by
         setting `api_ver` to either `1` ot `2`.
@@ -53,36 +50,8 @@ class ICD10Entry(ICDEntry):
         The API provides its response in different languages, which can be
         selected by setting `lang`, e.g. to `"en"`.
         """
-        if auth_method == "env":
-            icd_api_id = os.environ["ICD_API_ID"]
-            icd_api_secret = os.environ["ICD_API_SECRET"]
-        elif auth_method != "args":
-            raise ValueError("`auth_method` must be either 'args' or 'env'.")
-
-        if icd_api_id is None or icd_api_secret is None:
-            raise ValueError("Both ICD_API_ID and ICD_API_SECRET must be set.")
-
-        # Authenticate
-        token_endpoint = "https://icdaccessmanagement.who.int/connect/token"
-        payload = {
-            "client_id": icd_api_id,
-            "client_secret": icd_api_secret,
-            "scope": "icdapi_access",
-            "grant_type": "client_credentials"
-        }
-        response = requests.post(token_endpoint, data=payload)
-        if response.status_code != requests.codes.ok:
-            raise requests.HTTPError("Access denied.")
-        access_token = response.json()["access_token"]
-
-        # Make request
         uri = f"https://id.who.int/icd/release/10/{self.release}/{self.code}"
-        headers = {
-            "Authorization": "Bearer " + access_token,
-            "Accept": "application/json",
-            "Accept-Language": lang,
-            "API-Version": f"v{api_ver}",
-        }
+        headers = create_headers(api_ver)
         response = requests.get(uri, headers=headers)
 
         # check if request was successful, if not, try to get another release
@@ -250,9 +219,7 @@ def get_codex(release: str = "2019", verbose: bool = False) -> ICD10Root:
     """
     verboseprint = print if verbose else lambda *a, **k: None
 
-    xml_path = os.path.join(
-        DATA_DIR, "icd-10/", f"icd10{release}en.xml"
-    )
+    xml_path = DATA_DIR / "icd-10" / f"icd10{release}en.xml"
 
     verboseprint(f"Looking for XML file at {xml_path}...", end="")
     if not os.path.exists(xml_path):

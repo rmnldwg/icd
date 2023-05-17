@@ -1,3 +1,4 @@
 import pkg_resources
+from pathlib import Path
 
-DATA_DIR = pkg_resources.resource_filename("icd", "_data/")
+DATA_DIR = Path(pkg_resources.resource_filename("icd", "_data"))

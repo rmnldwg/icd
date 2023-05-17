@@ -4,9 +4,89 @@ for the International statistical classification of diseases and related health
 problems (10th revision).
 """
 from __future__ import annotations
+from functools import lru_cache
 
+import os
 import warnings
+import time
+import requests
 from typing import Dict, List, Optional
+
+
+def create_headers(
+    api_ver: int = 2,
+    language: str = "en",
+) -> Dict[str, str]:
+    """
+    Create headers for the ICD API.
+    """
+    headers = {
+        "Accept": "application/json",
+        "Accept-Language": language,
+        "API-Version": f"v{api_ver}",
+    }
+
+    access_token = fetch_access_token()
+    if access_token is not None:
+        headers["Authorization"] = f"Bearer {access_token}"
+    
+    return headers
+
+
+def get_hostname() -> str:
+    """
+    Get the hostname of the ICD API.
+    """
+    return os.getenv("ICD_API_HOSTNAME", "id.who.int")
+
+
+@lru_cache
+def _fetch_access_token(
+    icd_api_id: str,
+    icd_api_secret: str,
+    ttl_hash: str = None,
+) -> Optional[str]:
+    del ttl_hash
+
+    if icd_api_id is None or icd_api_secret is None:
+        raise ValueError("Both env vars ICD_API_ID and ICD_API_SECRET must be set.")
+
+    token_endpoint = "https://icdaccessmanagement.who.int/connect/token"
+    payload = {
+        "client_id": icd_api_id,
+        "client_secret": icd_api_secret,
+        "scope": "icdapi_access",
+        "grant_type": "client_credentials"
+    }
+    response = requests.post(token_endpoint, data=payload)
+
+    if response.status_code != requests.codes.ok:
+        return None
+
+    access_token = response.json()["access_token"]
+    return access_token
+
+
+def get_ttl_hash(seconds: int = 3600) -> int:
+    """
+    Get a hash that changes every `seconds` seconds.
+    """
+    return int(time.time() / seconds)
+
+
+def fetch_access_token() -> Optional[str]:
+    """
+    Fetch an access token from the ICD API.
+
+    The access token is used to authenticate requests to the ICD API. It is only
+    valid for 1 hour and therefore it is cached for up to 1 hour using the
+    `get_ttl_hash` function.
+    """
+    icd_api_id = os.getenv("ICD_API_ID")
+    icd_api_secret = os.getenv("ICD_API_SECRET")
+    ttl_hash = get_ttl_hash()
+
+    return _fetch_access_token(icd_api_id, icd_api_secret, ttl_hash)
 
 
 class ICDEntry():
