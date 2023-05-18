@@ -34,11 +34,14 @@ def create_headers(
     return headers
 
 
-def get_hostname() -> str:
+def get_hostname(hostname: Optional[str] = None) -> str:
     """
     Get the hostname of the ICD API.
     """
-    return os.getenv("ICD_API_HOSTNAME", "id.who.int")
+    if hostname is None:
+        return os.getenv("ICD_API_HOSTNAME", "id.who.int")
+
+    return hostname
 
 
 @lru_cache

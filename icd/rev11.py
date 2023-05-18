@@ -41,74 +41,87 @@ from icd.base import (
 )
 
 
-def fetch_description_from_linearization(
-    numeric_id: str,
-    release_id: str = "2023-01",
-    linearization_name: str  = "mms",
-    api_ver: int = 2,
-) -> str:
-    """
-    Get the description of an entry from the ICD API using its linearization URI.
-
-    The description is either stored as `definition` or `codingNote` of the JSON
-    response from the ICD API.
-
-    Examples:
-    >>> fetch_description_from_linearization("662394760")
-    'A condition characterised by the dysfunction or lack of function of a surgically created urine reservoir within the body, specifically along the path by which urine enters the pouch.'
-    """
-    hostname = get_hostname()
-    uri = f"http://{hostname}/icd/release/11/{release_id}/{linearization_name}/{numeric_id}"
+def _fetch_and_parse_response(uri: str, api_ver: int = 2) -> dict:
+    """Fetch response for a given URI and parse it as JSON."""
     response = requests.get(uri, headers=create_headers(api_ver=api_ver))
     response.raise_for_status()
     parsed_response = response.json()
-
-    if "definition" in parsed_response:
-        return parsed_response["definition"]["@value"]
-    if "longDefinition" in parsed_response:
-        return parsed_response["longDefinition"]["@value"]
-    if "codingNote" in parsed_response:
-        return parsed_response["codingNote"]["@value"]
-
-    return ""
+    return parsed_response
 
 
-def fetch_description_from_code(
+def fetch_available_releases(
+    linearization_name: str = "mms",
+    api_ver: int = 2,
+) -> list[str]:
+    """
+    Fetch the available releases of a given linearization in the ICD API.
+    """
+    hostname = get_hostname()
+    uri = f"http://{hostname}/icd/release/11/{linearization_name}"
+    return _fetch_and_parse_response(uri, api_ver)["release"]
+
+
+def fetch_root(
+    release_id: str = "2023-01",
+    linearization_name: str = "mms",
+    api_ver: int = 2,
+) -> dict:
+    """
+    Fetch the root entry of a given linearization release from the ICD API.
+    """
+    hostname = get_hostname()
+    uri = f"http://{hostname}/icd/release/11/{release_id}/{linearization_name}"
+    return _fetch_and_parse_response(uri, api_ver)
+
+
+def fetch_id(
     code: str,
     release_id: str = "2023-01",
     linearization_name: str  = "mms",
     api_ver: int = 2,
 ) -> str:
     """
-    Get the description of an entry from the ICD API using its ICD code.
+    Fetch the numeric ID of an entry from the ICD API using its code.
 
-    This first needs to fetch the numeric ID of the entry from the API and then
-    uses the `fetch_description_from_linearization` function to get the actual
-    description.
+    This is useful for fetching the linearization URI of an entry when only the code
+    is known.
 
     Examples:
-    >>> fetch_description_from_code("5C81.0")
-    'A disorder characterised by low levels of high-density lipoprotein in the blood.'
+    >>> fetch_id(code="EK11")
+    '144637523'
     """
     hostname = get_hostname()
     uri = f"http://{hostname}/icd/release/11/{release_id}/{linearization_name}/codeinfo/{code}"
-    response = requests.get(uri, headers=create_headers(api_ver=api_ver))
-    response.raise_for_status()
-    parsed_response = response.json()
+    parsed_response = _fetch_and_parse_response(uri, api_ver)
 
-    if "stemId" in parsed_response:
+    try:
         linearization_uri = parsed_response["stemId"]
-        numeric_id = linearization_uri.split("/")[-1]
-        return fetch_description_from_linearization(
-            numeric_id=numeric_id,
-            release_id=release_id,
-            linearization_name=linearization_name,
-        )
-
-    return ""
+        return linearization_uri.split("/")[-1]
+    except KeyError as key_err:
+        raise KeyError(
+            f"Could not find stemId in response from the ICD API for the code {code}. "
+            f"Response: {parsed_response}"
+        ) from key_err
 
 
-def strip_dashes(text: str) -> str:
+def fetch_info(
+    stem_id: str,
+    release_id: str = "2023-01",
+    linearization_name: str  = "mms",
+    api_ver: int = 2,
+) -> dict:
+    """
+    Fetch the information of an entry from the ICD API using its stem ID.
+
+    When knowing the linearization ID of an entry, this function can be used to fetch
+    the information of the entry.
+    """
+    hostname = get_hostname()
+    uri = f"http://{hostname}/icd/release/11/{release_id}/{linearization_name}/{stem_id}"
+    return _fetch_and_parse_response(uri, api_ver)
+
+
+def _strip_dashes(text: str) -> str:
     """Remove leading dashes and spaces ffrom a string."""
     return re.sub(r"^[ -]+", "", text)
 
@@ -119,19 +132,6 @@ class ICD11Entry(ICDEntry):
     """
     revision: str = "11"
     """Major revision of the ICD codex"""
-
-    def description(self) -> str:
-        """
-        Get the description of the entry from the ICD API.
-
-        Example:
-        >>> ICD11Entry(code="EK11", title="Protein contact dermatitis").description()
-        'Immediate contact dermatitis due to exposure to proteins from plants, animal tissue and other organic matter.'
-        """
-        if not hasattr(self, "_description") or self._description is None:
-            self._description = fetch_description_from_code(self.code)
-
-        return self._description
 
 
 class ICD11Root(ICDRoot, ICD11Entry):
@@ -182,7 +182,7 @@ class ICD11Chapter(ICDChapter, ICD11Entry):
         """
         chapter = cls(
             code=series["ChapterNo"],
-            title=strip_dashes(series["Title"]),
+            title=_strip_dashes(series["Title"]),
         )
         advance()
 
@@ -214,7 +214,7 @@ class ICD11Block(ICDBlock, ICD11Entry):
         """
         block = cls(
             code=series["BlockId"],
-            title=strip_dashes(series["Title"]),
+            title=_strip_dashes(series["Title"]),
         )
         advance()
         block_depth = series["DepthInKind"]
@@ -267,7 +267,7 @@ class ICD11Category(ICDCategory, ICD11Entry):
         """
         category = cls(
             code=series["Code"],
-            title=strip_dashes(series["Title"]),
+            title=_strip_dashes(series["Title"]),
         )
         advance()
         category_depth = series["DepthInKind"]
