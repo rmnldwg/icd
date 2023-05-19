@@ -155,18 +155,15 @@ class ICD11Root(ICDRoot, ICD11Entry):
             ),
             release="2023-01",   # At the time of writing, this is the latest release
         )
-        advance()
 
         table["Grouping6"] = None
         is_chapter = table["ClassKind"] == "chapter"
         is_not_V_or_X = table["ChapterNo"].str.match(r"^[^VX]")
         chapter_rows = table.loc[is_chapter & is_not_V_or_X]
-        print(f"Found {len(chapter_rows)} chapters.")
 
         for _, chapter_row in chapter_rows.iterrows():
             chapter_num = chapter_row["ChapterNo"]
             chapter_table = table.loc[table["ChapterNo"] == chapter_num]
-            print(f"Chapter {chapter_num} has {len(chapter_table)} entries.")
             chapter = ICD11Chapter.from_series(chapter_row, chapter_table, advance=advance)
             root.add_child(chapter)
 
@@ -201,6 +198,15 @@ class ICD11Chapter(ICDChapter, ICD11Entry):
         for _, block_row in block_rows.iterrows():
             block = ICD11Block.from_series(block_row, table, advance=advance)
             chapter.add_child(block)
+
+        is_category = table["ClassKind"] == "category"
+        has_no_grouping = table["Grouping1"].isna()
+        has_depth_1 = table["DepthInKind"] == 1
+        category_rows = table.loc[is_category & is_same_chapter & has_no_grouping & has_depth_1]
+
+        for _, category_row in category_rows.iterrows():
+            category = ICD11Category.from_series(category_row, table, advance=advance)
+            chapter.add_child(category)
 
         return chapter
 
