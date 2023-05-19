@@ -136,9 +136,11 @@ class ICD11Entry(ICDEntry):
 
 class ICD11Root(ICDRoot, ICD11Entry):
     """
-    Subclass of the `ICDRoot` to provide a classmethod for generating the
-    entire codex from a pandas `DataFrame`.
+    Subclass of the `ICDRoot` to provide classmethods for generating the codex from
+    either a pandas `DataFrame` or directly from the ICD API.
     """
+    # @classmethod
+    # def from_api(cls, advance: Callable) -> ICD11Root:
 
     @classmethod
     def from_table(cls, table: pd.DataFrame, advance: Callable) -> ICD11Root:
@@ -155,12 +157,17 @@ class ICD11Root(ICDRoot, ICD11Entry):
         )
         advance()
 
+        table["Grouping6"] = None
         is_chapter = table["ClassKind"] == "chapter"
         is_not_V_or_X = table["ChapterNo"].str.match(r"^[^VX]")
         chapter_rows = table.loc[is_chapter & is_not_V_or_X]
+        print(f"Found {len(chapter_rows)} chapters.")
 
         for _, chapter_row in chapter_rows.iterrows():
-            chapter = ICD11Chapter.from_series(chapter_row, table, advance=advance)
+            chapter_num = chapter_row["ChapterNo"]
+            chapter_table = table.loc[table["ChapterNo"] == chapter_num]
+            print(f"Chapter {chapter_num} has {len(chapter_table)} entries.")
+            chapter = ICD11Chapter.from_series(chapter_row, chapter_table, advance=advance)
             root.add_child(chapter)
 
         return root
@@ -221,23 +228,23 @@ class ICD11Block(ICDBlock, ICD11Entry):
 
         is_block = table["ClassKind"] == "block"
         is_descendant = table[f"Grouping{block_depth}"] == block.code
-        
-        if block_depth < 5:
-            is_not_deeper = table[f"Grouping{block_depth + 1}"].isna()
-        else:
-            is_not_deeper = True
+        is_one_deeper = table["DepthInKind"] == block_depth + 1
 
-        sub_block_rows = table.loc[is_block & is_descendant & is_not_deeper]
+        sub_block_rows = table.loc[is_block & is_descendant & is_one_deeper]
 
         for _, sub_block_row in sub_block_rows.iterrows():
-            sub_block = ICD11Block.from_series(sub_block_row, table, advance=advance)
+            sub_table = table.loc[is_descendant]
+            sub_block = ICD11Block.from_series(sub_block_row, sub_table, advance=advance)
             block.add_child(sub_block)
 
         is_category = table["ClassKind"] == "category"
-        categery_rows = table.loc[is_category & is_descendant & is_not_deeper]
+        is_under_block = table["DepthInKind"] == 1
+        is_one_deeper = table[f"Grouping{block_depth + 1}"].isna()
+        category_rows = table.loc[is_category & is_descendant & is_under_block & is_one_deeper]
 
-        for _, category_row in categery_rows.iterrows():
-            category = ICD11Category.from_series(category_row, table, advance=advance)
+        for _, category_row in category_rows.iterrows():
+            sub_table = table.loc[is_category & is_descendant]
+            category = ICD11Category.from_series(category_row, sub_table, advance=advance)
             block.add_child(category)
 
         return block
@@ -248,7 +255,13 @@ class ICD11Block(ICDBlock, ICD11Entry):
         Not implementable for ICD 11, but necessary for the `base.ICDEntry.add_child`
         method.`
         """
-        return True
+        this_level = int(re.match(r"BlockL(\d+)", self.code).group(1))
+        other_level = int(re.match(r"BlockL(\d+)", block.code).group(1))
+
+        if other_level == this_level + 1:
+            return True
+
+        return False
 
 
 class ICD11Category(ICDCategory, ICD11Entry):
@@ -276,9 +289,9 @@ class ICD11Category(ICDCategory, ICD11Entry):
             return category
 
         is_category = table["ClassKind"] == "category"
-        has_depth_plus_1 = table["DepthInKind"] == category_depth + 1
+        is_one_deeper = table["DepthInKind"] == category_depth + 1
         does_code_match = table["Code"].str.startswith(category.code, na=False)
-        sub_category_rows = table.loc[is_category & has_depth_plus_1 & does_code_match]
+        sub_category_rows = table.loc[is_category & is_one_deeper & does_code_match]
 
         for _, sub_category_row in sub_category_rows.iterrows():
             sub_category = ICD11Category.from_series(sub_category_row, table, advance=advance)
