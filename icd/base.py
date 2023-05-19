@@ -52,6 +52,10 @@ def _fetch_access_token(
 ) -> Optional[str]:
     del ttl_hash
 
+    if get_hostname() != "id.who.int":
+        logging.info("Not fetching access token for local ICD API.")
+        return None
+
     if icd_api_id is None or icd_api_secret is None:
         logging.warning("ICD_API_ID or ICD_API_SECRET not set, authentication might fail.")
 
@@ -65,9 +69,11 @@ def _fetch_access_token(
     response = requests.post(token_endpoint, data=payload)
 
     if response.status_code != requests.codes.ok:
+        logging.warning("Failed to fetch access token.")
         return None
 
     access_token = response.json()["access_token"]
+    logging.info("Successfully fetched and cached access token.")
     return access_token
 
 

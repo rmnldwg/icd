@@ -13,6 +13,8 @@ The underlying offical data can be obtained from the
 [download]: https://icd.who.int/browse11/Downloads/Download?fileName=simpletabulation.zip
 """
 from __future__ import annotations
+import logging
+from pathlib import Path
 
 import re
 from typing import Callable
@@ -46,6 +48,8 @@ def _fetch_and_parse_response(uri: str, api_ver: int = 2) -> dict:
     response = requests.get(uri, headers=create_headers(api_ver=api_ver))
     response.raise_for_status()
     parsed_response = response.json()
+    logging.info(f"Succesfully fetched JSON data from {uri}")
+    logging.debug(f"JSON data: {parsed_response}")
     return parsed_response
 
 
@@ -81,7 +85,7 @@ def fetch_id(
     api_ver: int = 2,
 ) -> str:
     """
-    Fetch the numeric ID of an entry from the ICD API using its code.
+    Fetch the numeric "stem ID" of an entry from the ICD API using its code.
 
     This is useful for fetching the linearization URI of an entry when only the code
     is known.
@@ -114,7 +118,7 @@ def fetch_info(
     Fetch the information of an entry from the ICD API using its stem ID.
 
     When knowing the linearization ID of an entry, this function can be used to fetch
-    the information of the entry.
+    the information of the entry, like a definition or its parent/children.
     """
     hostname = get_hostname()
     uri = f"http://{hostname}/icd/release/11/{release_id}/{linearization_name}/{stem_id}"
@@ -122,7 +126,7 @@ def fetch_info(
 
 
 def _strip_dashes(text: str) -> str:
-    """Remove leading dashes and spaces ffrom a string."""
+    """Remove leading dashes and spaces from a string."""
     return re.sub(r"^[ -]+", "", text)
 
 
@@ -133,17 +137,42 @@ class ICD11Entry(ICDEntry):
     revision: str = "11"
     """Major revision of the ICD codex"""
 
+    def __init__(self, *args, stem_id: str, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.stem_id = stem_id
+
+    @property
+    def api_info(self) -> dict:
+        """
+        Provide the information of the entry from the ICD API.
+
+        This is a cached property, so the information is only fetched once.
+        Nonetheless, this may be considered an expesive operation and not just a
+        simple attribute access.
+        """
+        if not hasattr(self, "_api_info"):
+            self._api_info = fetch_info(
+                stem_id=self.stem_id,
+                release_id=self.release,
+                linearization_name="mms",
+                api_ver=2,
+            )
+
+        return self._api_info
+
 
 class ICD11Root(ICDRoot, ICD11Entry):
     """
     Subclass of the `ICDRoot` to provide classmethods for generating the codex from
     either a pandas `DataFrame` or directly from the ICD API.
     """
-    # @classmethod
-    # def from_api(cls, advance: Callable) -> ICD11Root:
-
     @classmethod
-    def from_table(cls, table: pd.DataFrame, advance: Callable) -> ICD11Root:
+    def from_table(
+        cls,
+        table: pd.DataFrame,
+        advance: Callable,
+        release: str = "2023-01",
+    ) -> ICD11Root:
         """
         Create root from a pandas table and initialize codex generation
         """
@@ -153,7 +182,8 @@ class ICD11Root(ICDRoot, ICD11Entry):
                 "International Statistical Classification of Diseases and "
                 "Related Health Problems, 11th Revision"
             ),
-            release="2023-01",   # At the time of writing, this is the latest release
+            release=release,
+            stem_id="",
         )
 
         table["Grouping6"] = None
@@ -174,6 +204,14 @@ class ICD11Chapter(ICDChapter, ICD11Entry):
     """
     Subclass of the general `ICDChapter` adapted for the 11th revision of the ICD.
     """
+    @property
+    def description(self) -> str:
+        """
+        Description of the entry.
+        """
+        return self.api_info["definition"]["@value"]
+
+
     @classmethod
     def from_series(
         cls,
@@ -187,6 +225,7 @@ class ICD11Chapter(ICDChapter, ICD11Entry):
         chapter = cls(
             code=series["ChapterNo"],
             title=_strip_dashes(series["Title"]),
+            stem_id=series["Linearization (release) URI"].split("/")[-1],
         )
         advance()
 
@@ -228,6 +267,7 @@ class ICD11Block(ICDBlock, ICD11Entry):
         block = cls(
             code=series["BlockId"],
             title=_strip_dashes(series["Title"]),
+            stem_id=series["Linearization (release) URI"].split("/")[-1],
         )
         advance()
         block_depth = series["DepthInKind"]
@@ -274,6 +314,14 @@ class ICD11Category(ICDCategory, ICD11Entry):
     """
     Subclass of the general `ICDCategory` adapted for the 11th revision of the ICD.
     """
+    @property
+    def description(self) -> str:
+        """
+        Description of the entry.
+        """
+        return self.api_info["definition"]["@value"]
+
+
     @classmethod
     def from_series(
         cls,
@@ -287,6 +335,7 @@ class ICD11Category(ICDCategory, ICD11Entry):
         category = cls(
             code=series["Code"],
             title=_strip_dashes(series["Title"]),
+            stem_id=series["Linearization (release) URI"].split("/")[-1],
         )
         advance()
         category_depth = series["DepthInKind"]
@@ -310,7 +359,12 @@ def get_codex(verbose: bool = True) -> ICD11Root:
     """
     Get the entire ICD 11 codex as an `ICD11Root` object.
     """
-    table = pd.read_csv(DATA_DIR / "icd-11" / "simpletabulation.csv", low_memory=False)
+    table_dir = DATA_DIR / "icd-11"
+    table_files = sorted(table_dir.glob("*-*-simpletabulation.csv"))
+    latest_table = table_files[-1]
+    release = re.match(r"(\d{4}-\d{2})", latest_table.name).group(1)
+
+    table = pd.read_csv(latest_table, low_memory=False)
     is_not_V_or_X = table["ChapterNo"].str.match(r"^[^VX]")
 
     with Progress(
@@ -320,11 +374,11 @@ def get_codex(verbose: bool = True) -> ICD11Root:
         TimeElapsedColumn(),
     ) as progress:
         task = progress.add_task(
-            "Generating ICD 11 codex...",
+            f"Generate ICD 11 codex (release: {release})...",
             total=is_not_V_or_X.sum(),
             visible=verbose,
         )
         advance = lambda: progress.update(task, advance=1)
-        codex = ICD11Root.from_table(table, advance=advance)
+        codex = ICD11Root.from_table(table, advance=advance, release=release)
 
     return codex
