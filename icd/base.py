@@ -8,6 +8,7 @@ from functools import lru_cache
 import logging
 
 import os
+import re
 import warnings
 import time
 import requests
@@ -99,6 +100,11 @@ def fetch_access_token() -> Optional[str]:
     return _fetch_access_token(icd_api_id, icd_api_secret, ttl_hash)
 
 
+def _strip_dashes(text: str) -> str:
+    """Remove leading dashes and spaces from a string."""
+    return re.sub(r"^[ -]+", "", text)
+
+
 class ICDEntry():
     """
     Base class representing an abstract ICD chapter, block or category of ICD
@@ -129,7 +135,7 @@ class ICDEntry():
             parent.add_child(self)
 
         self.code = code
-        self.title = title
+        self._title = title
 
         self.children = []
         if children is not None:
@@ -149,6 +155,13 @@ class ICDEntry():
 
     def __len__(self):
         return 1 + sum([len(child) for child in self.children])
+
+    @property
+    def title(self):
+        """
+        The title of the ICD entry.
+        """
+        return _strip_dashes(self._title)
 
     @property
     def kind(self):
@@ -330,9 +343,10 @@ class ICDEntry():
 
     def add_child(self, new_child: ICDEntry):
         """
-        Add new child in a consistent manner. I.e., if the to-be-added child
-        is a block that would actually belong in an existing block, put it
-        there instead.
+        Add new child in a consistent manner.
+
+        This means that, if the to-be-added child is a block that would actually
+        belong in an existing block, put it there instead.
         """
         if issubclass(type(new_child), ICDRoot):
             warnings.warn("Cannot add root as child; skipping")
