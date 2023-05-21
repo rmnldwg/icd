@@ -6,6 +6,7 @@ problems (10th revision).
 from __future__ import annotations
 from functools import lru_cache
 import logging
+import warnings
 
 import os
 import re
@@ -13,6 +14,15 @@ import warnings
 import time
 import requests
 from typing import Dict, List, Optional
+
+
+logger = logging.getLogger("icd")
+
+
+class ICDAccessWarning(UserWarning):
+    """
+    Warning raised when the ICD API secrets or the access token are not found.
+    """
 
 
 def create_headers(
@@ -54,11 +64,14 @@ def _fetch_access_token(
     del ttl_hash
 
     if get_hostname() != "id.who.int":
-        logging.info("Not fetching access token for local ICD API.")
+        logger.info("Not fetching access token for local ICD API.")
         return None
 
     if icd_api_id is None or icd_api_secret is None:
-        logging.warning("ICD_API_ID or ICD_API_SECRET not set, authentication might fail.")
+        warnings.warn(
+            "ICD_API_ID or ICD_API_SECRET not set, authentication might fail.",
+            ICDAccessWarning,
+        )
 
     token_endpoint = "https://icdaccessmanagement.who.int/connect/token"
     payload = {
@@ -70,11 +83,11 @@ def _fetch_access_token(
     response = requests.post(token_endpoint, data=payload)
 
     if response.status_code != requests.codes.ok:
-        logging.warning("Failed to fetch access token.")
+        warnings.warn("Failed to fetch access token.", ICDAccessWarning)
         return None
 
     access_token = response.json()["access_token"]
-    logging.info("Successfully fetched and cached access token.")
+    logger.info("Successfully fetched and cached access token.")
     return access_token
 
 
