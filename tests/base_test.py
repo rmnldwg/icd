@@ -6,7 +6,8 @@ import hypothesis.strategies as st
 import pytest
 from hypothesis import assume, given, settings
 
-from icd.base import ICDBlock, ICDCategory, ICDChapter, ICDEntry, ICDRoot
+from icd.base import (ICDBlock, ICDCategory, ICDChapter, ICDEntry, ICDRoot,
+                      _strip_dashes)
 
 CLS_DICT = {
     "root": ICDRoot,
@@ -399,7 +400,7 @@ class TestICDRoot:
         child_dict = {child.code: child for child in children}
 
         assert root.code == code
-        assert root.title == title
+        assert root.title == _strip_dashes(title)
         assert root.kind == "root"
         assert root.release == release
         assert root.chapters == child_dict
@@ -420,7 +421,7 @@ class TestICDChapter:
         child_dict = {child.code: child for child in children}
 
         assert chapter.code == code
-        assert chapter.title == title
+        assert chapter.title == _strip_dashes(title)
         assert chapter.kind == "chapter"
         assert chapter.blocks == child_dict
 

@@ -1,14 +1,8 @@
-import pytest
-import requests
 from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 
-from icd.rev10 import (
-    ICD10Block,
-    ICD10Chapter,
-    ICD10Root,
-    get_codex,
-)
+from icd.base import _strip_dashes
+from icd.rev10 import ICD10Block, ICD10Chapter, ICD10Root, get_codex
 
 ICD10_CODEX = get_codex()
 
@@ -67,7 +61,7 @@ class TestICD10Root:
         """Test the constructor."""
         root = ICD10Root(title, release)
         assert root.code == "ICD-10 root"
-        assert root.title == title
+        assert root.title == _strip_dashes(title)
         assert root.release == release
 
 
@@ -82,7 +76,7 @@ class TestICD10Chapter:
         chapter = ICD10Chapter(code, title)
 
         assert all(c in "IVXLCDM" for c in chapter.code)
-        assert chapter.title == title
+        assert chapter.title == _strip_dashes(title)
         assert chapter.kind == "chapter"
 
 

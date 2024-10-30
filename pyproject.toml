@@ -20,10 +20,11 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "untangle",
-    "requests",
     "pandas",
+    "requests",
     "rich",
+    "setuptools",
+    "untangle == 1.1.1",
 ]
 dynamic = ["version"]
 
@@ -40,6 +41,9 @@ test = [
 docs = [
     "pdoc",
 ]
+
+[tool.setuptools.packages.find]
+include = ["icd"]
 
 [tool.setuptools_scm]
 write_to = "icd/_version.py"
