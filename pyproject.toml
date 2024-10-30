@@ -1,7 +1,50 @@
 [build-system]
-requires = ["setuptools>=46.4.0", "setuptools_scm[toml]>=6.2.0"]
+requires = [
+    "setuptools >= 61.0.0",
+    "setuptools_scm[toml] >= 7.0.0",
+]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "pyicd"
+description = "Python library for dealing with ICD codes (revisions 10 & 11)"
+authors = [{ name = "Roman Ludwig", email = "roman.ludwig@usz.ch" }]
+readme = "README.md"
+requires-python = ">=3.10"
+keywords = ["who", "icd", "icd-10", "icd-11", "classification", "disease"]
+license = { text = "MIT" }
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "untangle",
+    "requests",
+    "pandas",
+    "rich",
+]
+dynamic = ["version"]
+
+[project.urls]
+source = "https://github.com/rmnldwg/icd"
+documentation = "https://rmnldwg.github.io/icd"
+
+[project.optional-dependencies]
+test = [
+    "pytest",
+    "coverage",
+    "hypothesis",
+]
+docs = [
+    "pdoc",
+]
 
 [tool.setuptools_scm]
 write_to = "icd/_version.py"
 local_scheme = "no-local-version"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B", "C", "R", "U", "D", "I", "S", "T", "A", "N"]
+ignore = ["D204", "D205", "D212"]
