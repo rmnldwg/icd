@@ -13,7 +13,6 @@ which requires one to be logged in to access the underlying files.
 from __future__ import annotations
 
 import os
-from typing import Optional
 
 import requests
 import untangle
@@ -32,8 +31,8 @@ class ICD10Entry(ICDEntry):
     def request(
         self,
         auth_method: str = "args",
-        icd_api_id: Optional[str] = None,
-        icd_api_secret: Optional[str] = None,
+        icd_api_id: str | None = None,
+        icd_api_secret: str | None = None,
         api_ver: int = 2,
         lang: str = "en",
     ) -> str:
@@ -257,7 +256,7 @@ def get_codex(release: str = "2019", verbose: bool = False) -> ICD10Root:
     verboseprint(f"Looking for XML file at {xml_path}...", end="")
     if not os.path.exists(xml_path):
         verboseprint("FAILED")
-        raise IOError(f"File {xml_path} does not exist")
+        raise OSError(f"File {xml_path} does not exist")
     verboseprint("FOUND")
 
     verboseprint("Parsing XML...", end="")

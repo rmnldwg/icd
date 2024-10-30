@@ -14,14 +14,9 @@ The underlying offical data can be obtained from the
 """
 from __future__ import annotations
 
-import os
-from typing import Optional, TextIO
-
 import pandas as pd
-import requests
 
-from ._config import DATA_DIR
-from .base import ICDBlock, ICDCategory, ICDChapter, ICDEntry, ICDRoot
+from .base import ICDBlock, ICDChapter, ICDEntry, ICDRoot
 
 
 class ICD11Entry(ICDEntry):

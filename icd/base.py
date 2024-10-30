@@ -1,15 +1,14 @@
 """
-This module defines dataclasses that can parse, display and provide utilities
+Module that defines dataclasses that can parse, display and provide utilities
 for the International statistical classification of diseases and related health
 problems (10th revision).
 """
 from __future__ import annotations
 
 import warnings
-from typing import Dict, List, Optional
 
 
-class ICDEntry():
+class ICDEntry:
     """
     Base class representing an abstract ICD chapter, block or category of ICD
     10, ICD 10-CM or ICD 11.
@@ -21,7 +20,7 @@ class ICDEntry():
         code: str,
         title: str,
         parent: ICDEntry = None,
-        children: Optional[List[ICDEntry]] = None,
+        children: list[ICDEntry] | None = None,
         **_kwargs
     ):
         """
@@ -175,7 +174,7 @@ class ICDEntry():
             return 1
         return self.parent.depth_in_kind + 1
 
-    def _child_dict(self, kind: Optional[str] = None) -> Dict[str, ICDEntry]:
+    def _child_dict(self, kind: str | None = None) -> dict[str, ICDEntry]:
         if kind is not None:
             return {c.code: c for c in self.children if c.kind == kind}
         return {c.code: c for c in self.children}
@@ -183,7 +182,7 @@ class ICDEntry():
     def tree(
         self,
         prefix="",
-        maxdepth: Optional[int] = None,
+        maxdepth: int | None = None,
         print_out: bool = True
     ):
         """
@@ -273,7 +272,7 @@ class ICDEntry():
 
     def remove_child(self, child: ICDEntry):
         """
-        Remove `child` from `self.children` list in a cautios manner. This
+        Remove `child` from `self.children` list in a cautious manner. This
         means that if the child has already been added as some other object's
         child and has hence already a new `parent` attribute, it won't be
         deleted.
@@ -291,7 +290,7 @@ class ICDEntry():
         self_dotless_code = self.code.replace('.', '')
         return code in self.code or code in self_dotless_code
 
-    def search(self, code: str, maxdepth: Optional[int] = None) -> List[ICDEntry]:
+    def search(self, code: str, maxdepth: int | None = None) -> list[ICDEntry]:
         """
         Search a given code in the tree.
 
@@ -315,7 +314,7 @@ class ICDEntry():
 
         return res
 
-    def exists(self, code: str, maxdepth: Optional[int] = None) -> bool:
+    def exists(self, code: str, maxdepth: int | None = None) -> bool:
         """
         Check if a given `code` exists in the codex tree.
 
@@ -333,9 +332,9 @@ class ICDEntry():
     def get(
         self,
         code: str,
-        maxdepth: Optional[int] = None,
+        maxdepth: int | None = None,
         kind: str = "category",
-    ) -> Optional[ICDEntry]:
+    ) -> ICDEntry | None:
         """
         Return the ICD category with the given `code` that is of the specified
         `kind` if it exists. Will work with or without the dot in the `code`.
@@ -366,10 +365,12 @@ class ICDRoot(ICDEntry):
         self._release = release
 
     @property
-    def chapters(self) -> Dict[str, ICDChapter]:
-        """Returns a dictionary containing all the ICD chapters loaded under a
+    def chapters(self) -> dict[str, ICDChapter]:
+        """
+        Returns a dictionary containing all the ICD chapters loaded under a
         roman-numeral key. E.g., chapter 2 can be accessed via something like
-        `root.chapter['II']`."""
+        `root.chapter['II']`.
+        """
         return self._child_dict(kind="chapter")
 
 
@@ -387,10 +388,12 @@ class ICDChapter(ICDEntry):
         super().__init__(code, title, *args, **kwargs)
 
     @property
-    def blocks(self) -> Dict[str, ICDBlock]:
-        """Returns a dictionary containing all blocks loaded for this chapter
+    def blocks(self) -> dict[str, ICDBlock]:
+        """
+        Returns a dictionary containing all blocks loaded for this chapter
         under a key corresponding to their ICD-range. E.g., block `C00-C96`
-        contains all categories with codes ranging from `C00` to `C96`."""
+        contains all categories with codes ranging from `C00` to `C96`.
+        """
         return self._child_dict(kind="block")
 
     @staticmethod
@@ -425,20 +428,25 @@ class ICDBlock(ICDEntry):
         super().__init__(code, title, *args, **kwargs)
 
     @property
-    def blocks(self) -> Optional[ICDBlock]:
-        """Like :class:`ICDChapter`, a block might have blocks as children,
-        which can be accessed in the exact same way as for the chapter."""
+    def blocks(self) -> ICDBlock | None:
+        """
+        Like :class:`ICDChapter`, a block might have blocks as children,
+        which can be accessed in the exact same way as for the chapter.
+        """
         return self._child_dict(kind="block")
 
     @property
-    def categories(self) -> Optional[ICDCategory]:
-        """In case the block does not have blocks, but categories as children,
+    def categories(self) -> ICDCategory | None:
+        """
+        In case the block does not have blocks, but categories as children,
         they can be accessed via the `category` attribute, which also returns a
-        dictionary, just like `block`."""
+        dictionary, just like `block`.
+        """
         return self._child_dict(kind="category")
 
     def should_contain(self, block: ICDBlock) -> bool:
-        """Check whether a given block should be contained by this block.
+        """
+        Check whether a given block should be contained by this block.
 
         This method should be overriden by any inheriting class with some
         custom logic to check whether a block should actually be contained in
@@ -467,7 +475,9 @@ class ICDCategory(ICDEntry):
 
     @property
     def categories(self) -> ICDCategory:
-        """If there exists a finer classification of the category, this
+        """
+        If there exists a finer classification of the category, this
         property returns them as a dictionary of respective ICDs as key and the
-        actual entry as value."""
+        actual entry as value.
+        """
         return self._child_dict(kind="category")
