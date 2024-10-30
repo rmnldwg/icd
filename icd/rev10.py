@@ -17,14 +17,8 @@ import untangle
 from rich.progress import track
 
 from ._config import DATA_DIR
-from .base import (
-    ICDBlock,
-    ICDCategory,
-    ICDChapter,
-    ICDEntry,
-    ICDRoot,
-    create_headers,
-)
+from .base import (ICDBlock, ICDCategory, ICDChapter, ICDEntry, ICDRoot,
+                   create_headers)
 
 
 class ICD10Entry(ICDEntry):
@@ -220,7 +214,7 @@ def get_codex(release: str = "2019", verbose: bool = False) -> ICD10Root:
     verboseprint(f"Looking for XML file at {xml_path}...", end="")
     if not xml_path.exists() or not xml_path.is_file():
         verboseprint("FAILED")
-        raise IOError(f"File {xml_path} does not exist")
+        raise OSError(f"File {xml_path} does not exist")
     verboseprint("FOUND")
 
     verboseprint("Parsing XML...", end="")

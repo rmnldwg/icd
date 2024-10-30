@@ -8,7 +8,6 @@
 [![docs badge](https://github.com/rmnldwg/icd/actions/workflows/docs.yml/badge.svg?style=flat)](https://rmnldwg.github.io/icd)
 [![codecov](https://codecov.io/gh/rmnldwg/icd/branch/main/graph/badge.svg?token=53LOK18GLT)](https://codecov.io/gh/rmnldwg/icd)
 
-
 [license file]: https://github.com/rmnldwg/icd/blob/main/LICENSE
 [ICD-10]: https://icd.who.int/browse10
 [ICD-10-CM]: https://www.cdc.gov/nchs/icd/icd10cm.htm
@@ -32,7 +31,8 @@
 
 ## Disclaimer
 
-⚠️ This is not an official tool from the WHO, the CDC or any other authority with respect to clinical classifications. This Python package is independently developed and maintainaned. It should therefore probably not be used in critical clinical applications as it wasn't approved or cross-checked by the issuers of the classifications.
+> [!WARNING]
+> This is not an official tool from the WHO, the CDC or any other authority with respect to clinical classifications. This Python package is independently developed and maintained. It should therefore probably not be used in critical clinical applications as it wasn't approved or cross-checked by the issuers of the classifications.
 
 ***
 
@@ -78,7 +78,8 @@ returns
 ICD10Chapter('IX', 'Diseases of the circulatory system')
 ```
 
-⚠️ **NOTE:** There is also an attribute called `chapter`. But that attribute returns the current entry's chapter, which is either the entry itself, if it *is* a chapter, or the chapter under which the entry is grouped. This is a general pattern: The singular form (`root`, `chapter`, `block`) returns the grouping *above* the current entry, while the plural form (`chapters`, `blocks`, `categories`) return dictionaries with keys of ICD codes and values of children elements *below*.
+> [!NOTE]
+> There is also an attribute called `chapter`. But that attribute returns the current entry's chapter, which is either the entry itself, if it *is* a chapter, or the chapter under which the entry is grouped. This is a general pattern: The singular form (`root`, `chapter`, `block`) returns the grouping *above* the current entry, while the plural form (`chapters`, `blocks`, `categories`) return dictionaries with keys of ICD codes and values of children elements *below*.
 
 ### Blocks
 

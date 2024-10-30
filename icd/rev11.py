@@ -13,28 +13,19 @@ The underlying offical data can be obtained from the
 [download]: https://icd.who.int/browse11/Downloads/Download?fileName=simpletabulation.zip
 """
 from __future__ import annotations
-import logging
-from typing import Optional
-import warnings
 
+import logging
 import re
+import warnings
+from typing import Optional
 
 import pandas as pd
 import requests
 from rich.progress import track
 
-from .base import ICDBlock
-
 from ._config import DATA_DIR
-from .base import (
-    ICDBlock,
-    ICDCategory,
-    ICDChapter,
-    ICDEntry,
-    ICDRoot,
-    create_headers,
-    get_hostname,
-)
+from .base import (ICDBlock, ICDCategory, ICDChapter, ICDEntry, ICDRoot,
+                   create_headers, get_hostname)
 
 logger = logging.getLogger("icd")
 
@@ -441,7 +432,7 @@ def get_codex(table: Optional[pd.DataFrame] = None, verbose: bool = True) -> ICD
         disable=not verbose,
     ):
         depth = _depth_from_title(row["Title"])
-        
+
         next_entry = ICD11Entry.from_series(row)
         last_entry_by_depth[depth - 1].add_child(next_entry)
 

@@ -17,7 +17,6 @@ following ways:
 from __future__ import annotations
 
 import os
-from typing import Optional
 
 import requests
 import untangle
@@ -122,8 +121,10 @@ class ICD10CMChapter(ICDChapter, ICD10CMEntry):
 
 
 class ICD10CMBlock(ICDBlock, ICD10CMEntry):
-    """Subclassing `ICD10Block` to implement the appropriate `from_xml`
-    parsing method."""
+    """
+    Subclassing `ICD10Block` to implement the appropriate `from_xml`
+    parsing method.
+    """
     @classmethod
     def from_xml(cls, xml_section: untangle.Element) -> ICD10CMBlock:
         """Create block of ICD-10-CM categories from XML section"""
@@ -173,8 +174,10 @@ class ICD10CMBlock(ICDBlock, ICD10CMEntry):
 
 
 class ICD10CMCategory(ICDCategory, ICD10CMEntry):
-    """Subclassing `ICD10Category` to implement the appropriate `from_xml`
-    parsing method."""
+    """
+    Subclassing `ICD10Category` to implement the appropriate `from_xml`
+    parsing method.
+    """
     @classmethod
     def from_xml(cls, xml_diag: untangle.Element) -> ICD10CMCategory:
         """Recursively create tree of categories and subcategories from XML."""
@@ -216,7 +219,7 @@ def get_codex(
         verboseprint("FAILED, attempting download:")
         download_from_CDC(release, verbose=verbose)
     elif not os.path.exists(xml_path):
-        raise IOError(
+        raise OSError(
             f"File {xml_path} does not exist. Try setting `download` to `True` "
             "to automatically download the file from the CDC."
         )
@@ -232,11 +235,12 @@ def get_codex(
 
 def download_from_CDC(
     release: int = 2022,
-    custom_url: Optional[str] = None,
-    save_path: Optional[str] = None,
+    custom_url: str | None = None,
+    save_path: str | None = None,
     verbose: bool = False,
 ):
-    """Download ICD XML file from the CDC's website.
+    """
+    Download ICD XML file from the CDC's website.
 
     The `release` refers to the fiscal year the data was released in. With
     `custom_url` one can overwrite the default download url from the CDC
@@ -268,7 +272,7 @@ def download_from_CDC(
 
     verboseprint("Preparing save directory...", end="")
     if save_path is not None and not os.path.exists(save_path):
-        raise IOError(f"No such directory: {save_path}")
+        raise OSError(f"No such directory: {save_path}")
     elif save_path is None:
         save_path = os.path.join(
             DATA_DIR, "icd-10-cm/", f"icd10cm_tabular_{release}.xml"
